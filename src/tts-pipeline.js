@@ -126,12 +126,14 @@ export class TTSPipeline {
     }
   }
 
-  /** 文をAivisSpeechで合成してキューに積み、再生ループを起動する */
+  /** 文をAivisSpeechまたはCloud APIで合成してキューに積み、再生ループを起動する */
   _enqueueSynth(text) {
     this._inFlight++;
 
+    const client = this._speech._useCloud ? this._speech._cloud : this._speech._aivis;
+
     // 合成は即座に開始（再生を待たない）
-    const audioPromise = this._speech._aivis.synthesize(text)
+    const audioPromise = client.synthesize(text)
       .then(buf  => { this._inFlight--; return buf; })
       .catch(err => { this._inFlight--; throw err; });
 
@@ -183,7 +185,8 @@ export class TTSPipeline {
 
   /** AudioBuffer を再生し、終了まで待機する */
   async _playBuffer(audioBuffer) {
-    const audioCtx = await this._speech._aivis._getAudioCtx();
+    const client = this._speech._useCloud ? this._speech._cloud : this._speech._aivis;
+    const audioCtx = await client._getAudioCtx();
     return new Promise(resolve => {
       const src = audioCtx.createBufferSource();
       src.buffer = audioBuffer;
