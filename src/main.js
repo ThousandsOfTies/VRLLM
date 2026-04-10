@@ -84,9 +84,9 @@ async function loadBuiltinVRM() {
   setStatus('モデルを読み込み中...');
   loadVrmBtn.disabled = true;
   try {
-    await viewer.loadVRM('/vrm/Lilym.vrm', (pct) => setStatus(`読み込み中... ${pct}%`));
+    await viewer.loadVRM(import.meta.env.BASE_URL + 'vrm/Lilym.vrm', (pct) => setStatus(`読み込み中... ${pct}%`));
     setStatus('デフォルトモーション適用中...');
-    await viewer.loadVRMA('/vrma/VRMA_03.vrma', { loop: true, isIdle: true });
+    await viewer.loadVRMA(import.meta.env.BASE_URL + 'vrma/VRMA_03.vrma', { loop: true, isIdle: true });
     stopVRMABtn.classList.remove('hidden');
     vrmaPresetSelect.value = '';
     setStatus('準備完了');
