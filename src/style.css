@@ -473,4 +473,12 @@ body {
     padding: 16px;
   }
 
+  /* iOS Safari の自動ズームを完全に防止するため、入力要素は 16px 以上にする */
+  #chat-input,
+  #settings-inner input,
+  #settings-inner select,
+  #settings-inner textarea {
+    font-size: 16px;
+  }
+
 }
