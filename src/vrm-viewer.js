@@ -37,6 +37,17 @@ export class VRMViewer {
     this._vrmaAction = null;
     this._vrmaPlaying = false;
 
+    // canvasサイズが確定したタイミングで自動フィット（iOS dvh遅延対策）
+    this._fitPending = false;
+    const ro = new ResizeObserver(() => {
+      this.resize();
+      if (this._fitPending && this.vrm && this.canvas.clientWidth > 0 && this.canvas.clientHeight > 0) {
+        this._fitPending = false;
+        this._fitCameraToVRM(this.vrm);
+      }
+    });
+    ro.observe(this.canvas);
+
     this._animate();
   }
 
@@ -123,6 +134,7 @@ export class VRMViewer {
     // Tポーズ(腕水平)なら ~0、Aポーズ/腕下ろし済みなら ~1.2 に近い値が入っている
     this._armBaseZ = this._detectArmBaseZ(vrm);
 
+    this._fitPending = true; // ResizeObserver経由でも再フィットできるよう先にセット
     this._fitCameraToVRM(vrm);
 
     return vrm;
@@ -143,20 +155,34 @@ export class VRMViewer {
 
   /** モデルのバウンディングボックスに合わせてカメラと OrbitControls を自動調整 */
   _fitCameraToVRM(vrm) {
-    // フィット計算前に実際のcanvasサイズへ同期（初期ロード時にレイアウト未確定の場合の対策）
     this.resize();
+    // canvasがまだレイアウト未確定の場合はResizeObserverに委ねる
+    if (this.canvas.clientWidth === 0 || this.canvas.clientHeight === 0) {
+      this._fitPending = true;
+      return;
+    }
 
-    const box = new THREE.Box3().setFromObject(vrm.scene);
-    const size = box.getSize(new THREE.Vector3());
+    // ワールド行列を確定してからメッシュのみでbboxを計算
+    // (ボーン・ヘルパーを含めると中心がズレるため)
+    vrm.scene.updateWorldMatrix(true, true);
+    const box = new THREE.Box3();
+    vrm.scene.traverse((obj) => {
+      if (obj.isMesh && obj.geometry) {
+        box.expandByObject(obj);
+      }
+    });
+    if (box.isEmpty()) box.setFromObject(vrm.scene); // フォールバック
+
+    const size   = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
 
-    // モデル全体が収まる距離を算出
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const fovRad = (this.camera.fov * Math.PI) / 180;
-    const aspect = this.camera.aspect;
-    const fitDist = (maxDim / 2) / Math.tan(fovRad / 2) / Math.min(1, aspect) * 1.15;
+    // 縦・横それぞれ収まる距離を算出し、大きい方を採用
+    const tanHalfFov = Math.tan((this.camera.fov * Math.PI / 180) / 2);
+    const aspect     = this.camera.aspect;
+    const distH = (size.y / 2) / tanHalfFov;
+    const distW = (size.x / 2) / (aspect * tanHalfFov);
+    const fitDist = Math.max(distH, distW) * 1.25;
 
-    // カメラをモデル正面・やや上から
     this.camera.position.set(center.x, center.y, center.z + fitDist);
     this.camera.near = fitDist * 0.01;
     this.camera.far  = fitDist * 10;
@@ -164,6 +190,11 @@ export class VRMViewer {
 
     this.controls.target.copy(center);
     this.controls.update();
+  }
+
+  /** 外部から再フィットを呼べる公開メソッド */
+  fitCamera() {
+    if (this.vrm) this._fitCameraToVRM(this.vrm);
   }
 
   // ---- VRMA アニメーション API ----

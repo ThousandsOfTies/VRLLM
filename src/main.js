@@ -41,6 +41,8 @@ async function loadBuiltinVRM() {
     setStatus('デフォルトモーション適用中...');
     await viewer.loadVRMA(import.meta.env.BASE_URL + 'vrma/VRMA_03.vrma', { loop: true, isIdle: true });
     vrmaPresetSelect.value = 'vrma/VRMA_03.vrma';
+    // レイアウト確定後（dvh計算含む）に再フィット
+    requestAnimationFrame(() => viewer.fitCamera());
     setStatus('');
   } catch (err) {
     setStatus(`モデル読み込みエラー: ${err.message}`);
