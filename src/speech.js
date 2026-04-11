@@ -188,22 +188,20 @@ export class SpeechManager {
           this.isSpeaking = true;
           this.onSpeechStart?.();
 
-          // iOS Safari の onend 発火漏れバグ回避策
-          clearInterval(fallbackTimer);
-          fallbackTimer = setInterval(() => {
-            if (!window.speechSynthesis.speaking) {
-              clearInterval(fallbackTimer);
-              if (this.isSpeaking) {
-                console.warn('[TTS] onend fired by fallback timer');
-                this.isSpeaking = false;
-                this.onSpeechEnd?.();
-                resolve();
-              }
+          // iOS Safari の onend 発火漏れバグ回避策 (speakingフラグもバグる事があるため時間経過で強制終了)
+          const guessedDuration = Math.max(3000, utterance.text.length * 350 + 1000);
+          clearTimeout(fallbackTimer);
+          fallbackTimer = setTimeout(() => {
+            if (this.isSpeaking) {
+              console.warn('[TTS] onend fired by fallback timer (timeout)');
+              this.isSpeaking = false;
+              this.onSpeechEnd?.();
+              resolve();
             }
-          }, 500);
+          }, guessedDuration);
         };
         utterance.onend = () => {
-          clearInterval(fallbackTimer);
+          clearTimeout(fallbackTimer);
           if (this.isSpeaking) {
             this.isSpeaking = false;
             this.onSpeechEnd?.();
@@ -211,7 +209,7 @@ export class SpeechManager {
           }
         };
         utterance.onerror = (e) => {
-          clearInterval(fallbackTimer);
+          clearTimeout(fallbackTimer);
           this.isSpeaking = false;
           this.onSpeechEnd?.();
           if (e.error !== 'interrupted') reject(e);

@@ -192,11 +192,21 @@ export class TTSPipeline {
       src.buffer = audioBuffer;
       src.connect(client._gainNode);
       this._currentSrc = src;
-      src.onended = () => {
+
+      let isDone = false;
+      const finish = () => {
+        if (isDone) return;
+        isDone = true;
         this._currentSrc = null;
         resolve();
       };
+
+      src.onended = finish;
       src.start(0);
+
+      // セーフティネット: iOS Safariで再生がサスペンドされ onended が来ない事態を確実に回避する
+      const durationMs = audioBuffer.duration * 1000;
+      setTimeout(finish, durationMs + 800);
     });
   }
 }

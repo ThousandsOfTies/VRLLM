@@ -52,7 +52,7 @@ export class AivisSpeechClient {
       _syncDeviceVolume();
     }
     if (this._audioCtx.state === 'suspended') {
-      await this._audioCtx.resume();  // ← Chrome の自動再生ポリシー対応
+      this._audioCtx.resume().catch(e => console.warn('AudioContext resume ignored:', e));
     }
     return this._audioCtx;
   }
@@ -172,7 +172,7 @@ export class AivisCloudClient {
       _syncDeviceVolume();
     }
     if (this._audioCtx.state === 'suspended') {
-      await this._audioCtx.resume();
+      this._audioCtx.resume().catch(e => console.warn('AudioContext resume ignored:', e));
     }
     return this._audioCtx;
   }
