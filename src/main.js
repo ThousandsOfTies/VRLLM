@@ -317,22 +317,20 @@ clearHistoryBtn.addEventListener('click', () => {
 // ---- ウィンドウリサイズ ----
 window.addEventListener('resize', () => viewer.resize());
 
-// ---- モバイル: キーボード表示検知 (visualViewport API) ----
-if (window.visualViewport) {
-  let baseViewportHeight = window.visualViewport.height;
+// ---- モバイル: キーボード表示をfocus/blurで制御 ----
+// visualViewport より確実。タッチデバイスのみ適用。
+if (navigator.maxTouchPoints > 0) {
+  chatInput.addEventListener('focus', () => {
+    document.documentElement.classList.add('keyboard-open');
+  });
 
-  window.visualViewport.addEventListener('resize', () => {
-    const vh = window.visualViewport.height;
-    const keyboardOpen = vh < baseViewportHeight * 0.85;
-    document.documentElement.classList.toggle('keyboard-open', keyboardOpen);
-    if (!keyboardOpen) {
-      baseViewportHeight = Math.max(baseViewportHeight, vh);
-      // レイアウト確定後にresize & カメラリフィット
-      requestAnimationFrame(() => {
-        viewer.resize();
-        viewer.fitCamera();
-      });
-    }
+  chatInput.addEventListener('blur', () => {
+    document.documentElement.classList.remove('keyboard-open');
+    // レイアウト確定後にresize & カメラリフィット
+    requestAnimationFrame(() => {
+      viewer.resize();
+      viewer.fitCamera();
+    });
   });
 }
 

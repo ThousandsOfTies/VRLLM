@@ -9,16 +9,14 @@ body {
   font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', sans-serif;
   background: #0d0d1a;
   color: #e0e0f0;
-  /* safe-area-inset-top でステータスバー領域を常時確保 */
   height: 100dvh;
-  padding-top: env(safe-area-inset-top);
   overflow: hidden;
   overscroll-behavior: none;
 }
 
 #app {
   display: flex;
-  height: 100%; /* body の padding 分を除いた領域を使う */
+  height: 100dvh;
   position: relative;
 }
 
@@ -401,10 +399,11 @@ body {
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
+    /* Dynamic Island / ノッチの高さ分だけ上部に余白を確保 */
+    padding-top: env(safe-area-inset-top);
   }
 
-  /* キャンバスは明示的な高さで固定 (flex shorthand は使わない) */
-  /* transitionは禁止: アニメーション中にresize/fitが走るとカメラがズレる */
+  /* キャンバスは明示的な高さで固定 */
   #vrm-canvas {
     height: 45dvh;
   }
