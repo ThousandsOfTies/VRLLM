@@ -404,9 +404,9 @@ body {
   }
 
   /* キャンバスは明示的な高さで固定 (flex shorthand は使わない) */
+  /* transitionは禁止: アニメーション中にresize/fitが走るとカメラがズレる */
   #vrm-canvas {
     height: 45dvh;
-    transition: height 0.25s ease;
   }
 
   /* コントロールバー: 絶対配置を解除して通常フローへ */

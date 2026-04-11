@@ -319,18 +319,19 @@ window.addEventListener('resize', () => viewer.resize());
 
 // ---- モバイル: キーボード表示検知 (visualViewport API) ----
 if (window.visualViewport) {
-  // 初期の高さを基準にする（URLバー出現による変化に左右されない）
   let baseViewportHeight = window.visualViewport.height;
 
   window.visualViewport.addEventListener('resize', () => {
     const vh = window.visualViewport.height;
-    // 基準より15%以上縮んだらキーボードが出ていると判断
     const keyboardOpen = vh < baseViewportHeight * 0.85;
     document.documentElement.classList.toggle('keyboard-open', keyboardOpen);
     if (!keyboardOpen) {
-      // キーボードを閉じたとき基準高さを更新してresizeも通知
       baseViewportHeight = Math.max(baseViewportHeight, vh);
-      viewer.resize();
+      // レイアウト確定後にresize & カメラリフィット
+      requestAnimationFrame(() => {
+        viewer.resize();
+        viewer.fitCamera();
+      });
     }
   });
 }
