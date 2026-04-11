@@ -467,10 +467,4 @@ body {
     padding: 16px;
   }
 
-  /* キーボード表示時: 3Dビューワーを非表示 */
-  html.keyboard-open #viewer-panel {
-    height: 0;
-    overflow: hidden;
-    padding-top: 0;
-  }
 }

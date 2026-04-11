@@ -318,12 +318,13 @@ window.addEventListener('resize', () => viewer.resize());
 // ---- モバイル: キーボード表示をfocus/blurで制御 ----
 // visualViewport より確実。タッチデバイスのみ適用。
 // キーボード開閉はfocus/blurで制御
+const viewerPanel = document.getElementById('viewer-panel');
 if (navigator.maxTouchPoints > 0) {
   chatInput.addEventListener('focus', () => {
-    document.documentElement.classList.add('keyboard-open');
+    viewerPanel.style.display = 'none';
   });
   chatInput.addEventListener('blur', () => {
-    document.documentElement.classList.remove('keyboard-open');
+    viewerPanel.style.display = '';
   });
 }
 
