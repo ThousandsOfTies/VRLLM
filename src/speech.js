@@ -182,16 +182,36 @@ export class SpeechManager {
         const match = voices.find((v) => v.lang.startsWith(utterance.lang.slice(0, 2)));
         if (match) utterance.voice = match;
 
+        let fallbackTimer = null;
+
         utterance.onstart = () => {
           this.isSpeaking = true;
           this.onSpeechStart?.();
+
+          // iOS Safari の onend 発火漏れバグ回避策
+          clearInterval(fallbackTimer);
+          fallbackTimer = setInterval(() => {
+            if (!window.speechSynthesis.speaking) {
+              clearInterval(fallbackTimer);
+              if (this.isSpeaking) {
+                console.warn('[TTS] onend fired by fallback timer');
+                this.isSpeaking = false;
+                this.onSpeechEnd?.();
+                resolve();
+              }
+            }
+          }, 500);
         };
         utterance.onend = () => {
-          this.isSpeaking = false;
-          this.onSpeechEnd?.();
-          resolve();
+          clearInterval(fallbackTimer);
+          if (this.isSpeaking) {
+            this.isSpeaking = false;
+            this.onSpeechEnd?.();
+            resolve();
+          }
         };
         utterance.onerror = (e) => {
+          clearInterval(fallbackTimer);
           this.isSpeaking = false;
           this.onSpeechEnd?.();
           if (e.error !== 'interrupted') reject(e);
