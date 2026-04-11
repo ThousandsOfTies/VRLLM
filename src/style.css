@@ -399,6 +399,7 @@ body {
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
+    padding-top: env(safe-area-inset-top);
   }
 
   /* キャンバスは明示的な高さで固定 */
