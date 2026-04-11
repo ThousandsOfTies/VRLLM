@@ -9,14 +9,16 @@ body {
   font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', sans-serif;
   background: #0d0d1a;
   color: #e0e0f0;
+  /* safe-area-inset-top でステータスバー領域を常時確保 */
   height: 100dvh;
+  padding-top: env(safe-area-inset-top);
   overflow: hidden;
   overscroll-behavior: none;
 }
 
 #app {
   display: flex;
-  height: 100dvh;
+  height: 100%; /* body の padding 分を除いた領域を使う */
   position: relative;
 }
 
