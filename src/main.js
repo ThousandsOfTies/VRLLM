@@ -325,6 +325,7 @@ if (navigator.maxTouchPoints > 0) {
   });
   chatInput.addEventListener('blur', () => {
     viewerPanel.style.display = '';
+    window.scrollTo(0, 0);
   });
 }
 
