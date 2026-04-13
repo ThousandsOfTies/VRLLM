@@ -53,30 +53,106 @@
     <!-- 設定パネル (オーバーレイ) -->
     <div id="settings-panel" class="hidden">
       <div id="settings-inner">
-        <h2>⚙️ 設定</h2>
 
-        <label>
-          VRMモデル
-          <button type="button" id="load-vrm-btn">📁 VRMファイルを読み込む</button>
-          <span id="vrm-load-status" class="hint"></span>
-        </label>
-
-        <!-- Google Drive 同期 -->
-        <div class="drive-section">
-          <div class="drive-section-title">☁ Google Drive 同期</div>
-          <div id="drive-ui-out">
-            <button type="button" id="drive-signin-btn">Googleでサインイン</button>
+        <!-- ヘッダー：タイトル + Google 同期ステータス -->
+        <div id="settings-header">
+          <h2>⚙️ 設定</h2>
+          <div id="sync-status">
+            <button type="button" id="drive-signin-btn" class="sync-btn-out">☁ サインイン</button>
+            <div id="drive-ui-in" class="sync-btn-in hidden">
+              <span class="sync-badge">☁ 同期中</span>
+              <button type="button" id="drive-signout-btn" class="drive-signout">サインアウト</button>
+            </div>
           </div>
-          <div id="drive-ui-in" class="hidden">
+        </div>
 
+        <!-- タブバー -->
+        <div id="settings-tabs">
+          <button class="tab-btn active" data-tab="chara">キャラ</button>
+          <button class="tab-btn" data-tab="llm">LLM</button>
+          <button class="tab-btn" data-tab="voice">音声</button>
+          <button class="tab-btn" data-tab="sync">同期</button>
+        </div>
+
+        <!-- キャラタブ -->
+        <div class="tab-panel active" id="tab-chara">
+          <label>
+            VRMモデル
+            <button type="button" id="load-vrm-btn">📁 VRMファイルを読み込む</button>
+            <span id="vrm-load-status" class="hint"></span>
+          </label>
+          <label>
+            システムプロンプト
+            <textarea id="setting-system-prompt" rows="6"></textarea>
+          </label>
+        </div>
+
+        <!-- LLMタブ -->
+        <div class="tab-panel" id="tab-llm">
+          <label>
+            APIエンドポイント
+            <span class="hint">OpenAI互換ならOllama (http://localhost:11434/v1) も可</span>
+            <input type="text" id="setting-endpoint" placeholder="https://api.openai.com/v1">
+          </label>
+          <label>
+            APIキー
+            <span class="hint">Ollamaはダミー文字列でも可 (例: ollama)</span>
+            <input type="password" id="setting-api-key" placeholder="sk-...">
+          </label>
+          <label>
+            モデル名
+            <input type="text" id="setting-model" placeholder="gpt-4o-mini">
+          </label>
+        </div>
+
+        <!-- 音声タブ -->
+        <div class="tab-panel" id="tab-voice">
+          <label>
+            TTS 言語
+            <select id="setting-tts-lang">
+              <option value="ja-JP">日本語 (ja-JP)</option>
+              <option value="en-US">English (en-US)</option>
+              <option value="zh-CN">中文 (zh-CN)</option>
+            </select>
+          </label>
+          <label>
+            AivisSpeech URL
+            <span class="hint">起動中なら自動検出されます (デフォルト: http://localhost:10101)</span>
+            <input type="text" id="setting-aivis-url" placeholder="http://localhost:10101">
+          </label>
+          <label>
+            AivisSpeech 話者ID
+            <span class="hint">話者IDは AivisSpeech の画面で確認できます</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="number" id="setting-aivis-speaker" placeholder="888753760" style="flex:1">
+              <button type="button" id="aivis-check-btn">疎通確認</button>
+            </div>
+            <span id="aivis-status" class="hint"></span>
+          </label>
+          <label>
+            Aivis Cloud API キー
+            <span class="hint">Cloud API を使うと PC なしでスマホからも高品質 TTS が使えます (<a href="https://hub.aivis-project.com/cloud-api/dashboard" target="_blank">取得</a>)</span>
+            <input type="password" id="setting-cloud-api-key" placeholder="aivis-...">
+          </label>
+          <label>
+            Aivis Cloud API モデル UUID
+            <span class="hint">AivisHub のモデルページ URL に含まれる UUID (<a href="https://hub.aivis-project.com/" target="_blank">モデル一覧</a>)</span>
+            <input type="text" id="setting-cloud-model-uuid" placeholder="a59cb814-0083-4369-8542-f51a29e72af7">
+          </label>
+        </div>
+
+        <!-- 同期タブ -->
+        <div class="tab-panel" id="tab-sync">
+          <div class="drive-section">
             <!-- 設定同期 -->
+            <div class="drive-section-title">設定</div>
             <div class="drive-row">
-              <button type="button" id="drive-save-btn">↑ 設定を保存</button>
-              <button type="button" id="drive-load-btn">↓ 設定を読み込み</button>
+              <button type="button" id="drive-save-btn">↑ 保存</button>
+              <button type="button" id="drive-load-btn">↓ 読み込み</button>
             </div>
 
             <!-- 会話履歴 -->
-            <div class="drive-vrm-label">会話履歴</div>
+            <div class="drive-section-title">会話履歴</div>
             <div class="drive-row" style="align-items:center">
               <label class="drive-toggle-label">
                 <input type="checkbox" id="drive-autosave-chk">
@@ -88,7 +164,7 @@
             </div>
 
             <!-- キャラクタープリセット -->
-            <div class="drive-vrm-label">キャラクタープリセット</div>
+            <div class="drive-section-title">キャラクタープリセット</div>
             <div class="drive-row">
               <select id="drive-preset-select" style="flex:1">
                 <option value="">-- プリセットを選択 --</option>
@@ -102,7 +178,7 @@
             </div>
 
             <!-- VRMモデル -->
-            <div class="drive-vrm-label">VRMモデル</div>
+            <div class="drive-section-title">VRMモデル</div>
             <div class="drive-row">
               <button type="button" id="drive-upload-vrm-btn">↑ アップロード</button>
               <button type="button" id="drive-list-vrm-btn">↓ 一覧を取得</button>
@@ -113,70 +189,12 @@
             <button type="button" id="drive-apply-vrm-btn" class="hidden">このモデルを読み込む</button>
 
             <span id="drive-status" class="hint"></span>
-            <button type="button" id="drive-signout-btn" class="drive-signout">サインアウト</button>
           </div>
         </div>
+
         <input type="file" id="drive-vrm-upload-input" accept=".vrm" hidden>
 
-        <label>
-          APIエンドポイント
-          <span class="hint">OpenAI互換ならOllama (http://localhost:11434/v1) も可</span>
-          <input type="text" id="setting-endpoint" placeholder="https://api.openai.com/v1">
-        </label>
-
-        <label>
-          APIキー
-          <span class="hint">Ollamaはダミー文字列でも可 (例: ollama)</span>
-          <input type="password" id="setting-api-key" placeholder="sk-...">
-        </label>
-
-        <label>
-          モデル名
-          <input type="text" id="setting-model" placeholder="gpt-4o-mini">
-        </label>
-
-        <label>
-          TTS 言語
-          <select id="setting-tts-lang">
-            <option value="ja-JP">日本語 (ja-JP)</option>
-            <option value="en-US">English (en-US)</option>
-            <option value="zh-CN">中文 (zh-CN)</option>
-          </select>
-        </label>
-
-        <label>
-          AivisSpeech URL
-          <span class="hint">起動中なら自動検出されます (デフォルト: http://localhost:10101)</span>
-          <input type="text" id="setting-aivis-url" placeholder="http://localhost:10101">
-        </label>
-
-        <label>
-          AivisSpeech 話者ID
-          <span class="hint">話者IDは AivisSpeech の画面で確認できます</span>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input type="number" id="setting-aivis-speaker" placeholder="888753760" style="flex:1">
-            <button type="button" id="aivis-check-btn">疎通確認</button>
-          </div>
-          <span id="aivis-status" class="hint"></span>
-        </label>
-
-        <label>
-          Aivis Cloud API キー
-          <span class="hint">Cloud API を使うと PC なしでスマホからも高品質 TTS が使えます (<a href="https://hub.aivis-project.com/cloud-api/dashboard" target="_blank">取得</a>)</span>
-          <input type="password" id="setting-cloud-api-key" placeholder="aivis-...">
-        </label>
-
-        <label>
-          Aivis Cloud API モデル UUID
-          <span class="hint">AivisHub のモデルページ URL に含まれる UUID (<a href="https://hub.aivis-project.com/" target="_blank">モデル一覧</a>)</span>
-          <input type="text" id="setting-cloud-model-uuid" placeholder="a59cb814-0083-4369-8542-f51a29e72af7">
-        </label>
-
-        <label>
-          システムプロンプト
-          <textarea id="setting-system-prompt" rows="5"></textarea>
-        </label>
-
+        <!-- 共通アクション -->
         <div class="settings-actions">
           <button id="save-settings-btn">💾 保存</button>
           <button id="cancel-settings-btn">キャンセル</button>

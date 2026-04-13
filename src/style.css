@@ -274,11 +274,6 @@ body {
   overflow-y: auto;
 }
 
-#settings-inner h2 {
-  font-size: 17px;
-  color: #b8b0ff;
-  font-weight: 700;
-}
 
 #settings-inner label {
   display: flex;
@@ -403,6 +398,96 @@ body {
 }
 #aivis-check-btn:hover { background: #223322; }
 
+/* ---- 設定ヘッダー ---- */
+#settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+#settings-header h2 {
+  font-size: 17px;
+  color: #b8b0ff;
+  font-weight: 700;
+}
+
+#sync-status {
+  flex-shrink: 0;
+}
+
+.sync-btn-out {
+  background: #1a1a32;
+  color: #888;
+  border: 1px solid #2a2a48;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 600;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+.sync-btn-out:hover { background: #22223a; color: #aaa; }
+
+.sync-btn-in {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sync-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7a90ff;
+  background: #0e1830;
+  border: 1px solid #2a4060;
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+/* ---- 設定タブ ---- */
+#settings-tabs {
+  display: flex;
+  gap: 4px;
+  background: #0e0e22;
+  border-radius: 10px;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #666;
+  padding: 7px 4px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: #aaa; }
+.tab-btn.active {
+  background: #6c63ff;
+  color: #fff;
+}
+
+.tab-panel {
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+}
+.tab-panel.active {
+  display: flex;
+}
+
 /* ---- Google Drive 同期セクション ---- */
 .drive-section {
   display: flex;
@@ -415,10 +500,25 @@ body {
 }
 
 .drive-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #666;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+
+.drive-signed-in-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.drive-signed-in-label {
   font-size: 12px;
   font-weight: 700;
   color: #7a90ff;
-  letter-spacing: 0.05em;
 }
 
 .drive-vrm-label {

@@ -339,6 +339,16 @@ micBtn.addEventListener('pointercancel', () => {
   }
 });
 
+// ---- 設定タブ ----
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+  });
+});
+
 // ---- 設定パネル ----
 settingsBtn.addEventListener('click', () => {
   settingsPanel.classList.toggle('hidden');
@@ -486,7 +496,6 @@ const drivePresetDeleteBtn   = document.getElementById('drive-preset-delete-btn'
 const drivePresetNameInput   = document.getElementById('drive-preset-name-input');
 const drivePresetSaveBtn     = document.getElementById('drive-preset-save-btn');
 const driveSigninBtn     = document.getElementById('drive-signin-btn');
-const driveUiOut         = document.getElementById('drive-ui-out');
 const driveUiIn          = document.getElementById('drive-ui-in');
 const driveSaveBtn       = document.getElementById('drive-save-btn');
 const driveLoadBtn       = document.getElementById('drive-load-btn');
@@ -499,7 +508,8 @@ const driveStatus        = document.getElementById('drive-status');
 const driveVrmUploadInput = document.getElementById('drive-vrm-upload-input');
 
 function updateDriveSyncUI(isSignedIn) {
-  driveUiOut.classList.toggle('hidden', isSignedIn);
+  // ヘッダーのサインインボタン ↔ 同期バッジを切り替え
+  driveSigninBtn.classList.toggle('hidden', isSignedIn);
   driveUiIn.classList.toggle('hidden', !isSignedIn);
   if (!isSignedIn) {
     driveVrmSelect.classList.add('hidden');
