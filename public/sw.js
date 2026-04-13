@@ -30,8 +30,25 @@ self.addEventListener('fetch', (e) => {
   // POST等はキャッシュ対象外
   if (e.request.method !== 'GET') return;
 
-  // Stale-while-revalidate:
-  //   キャッシュがあれば即返しつつ、バックグラウンドでキャッシュを更新
+  // index.html はネットワーク優先:
+  //   常に最新版を取得し、オフライン時のみキャッシュにフォールバック
+  const isHtml = url.pathname.endsWith('.html')
+    || url.pathname.endsWith('/')
+    || url.pathname === '/';
+  if (isHtml) {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+          return res;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // JS/CSS/画像等はキャッシュ優先 (stale-while-revalidate):
+  //   Viteがハッシュ付きファイル名を使うため古くなる心配なし
   e.respondWith(
     caches.open(CACHE).then(async (cache) => {
       const cached = await cache.match(e.request);
