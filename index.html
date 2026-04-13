@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#0d0d1a">
+  <meta name="theme-color" content="#6c63ff">
+  <link rel="manifest" href="%BASE_URL%manifest.json">
+  <link rel="apple-touch-icon" href="%BASE_URL%icons/icon.svg">
   <title>VRoid AI アシスタント</title>
   <link rel="stylesheet" href="/src/style.css">
 </head>
@@ -66,19 +68,50 @@
             <button type="button" id="drive-signin-btn">Googleでサインイン</button>
           </div>
           <div id="drive-ui-in" class="hidden">
+
+            <!-- 設定同期 -->
             <div class="drive-row">
               <button type="button" id="drive-save-btn">↑ 設定を保存</button>
               <button type="button" id="drive-load-btn">↓ 設定を読み込み</button>
             </div>
-            <div class="drive-vrm-label">VRMモデル (Drive)</div>
+
+            <!-- 会話履歴 -->
+            <div class="drive-vrm-label">会話履歴</div>
+            <div class="drive-row" style="align-items:center">
+              <label class="drive-toggle-label">
+                <input type="checkbox" id="drive-autosave-chk">
+                <span class="drive-toggle-track"><span class="drive-toggle-thumb"></span></span>
+                <span>自動保存</span>
+              </label>
+              <button type="button" id="drive-save-history-btn">今すぐ保存</button>
+              <button type="button" id="drive-load-history-btn">読み込む</button>
+            </div>
+
+            <!-- キャラクタープリセット -->
+            <div class="drive-vrm-label">キャラクタープリセット</div>
             <div class="drive-row">
-              <button type="button" id="drive-upload-vrm-btn">↑ VRMをアップロード</button>
+              <select id="drive-preset-select" style="flex:1">
+                <option value="">-- プリセットを選択 --</option>
+              </select>
+              <button type="button" id="drive-preset-apply-btn">適用</button>
+              <button type="button" id="drive-preset-delete-btn">削除</button>
+            </div>
+            <div class="drive-row">
+              <input type="text" id="drive-preset-name-input" placeholder="プリセット名...">
+              <button type="button" id="drive-preset-save-btn">現在の設定を保存</button>
+            </div>
+
+            <!-- VRMモデル -->
+            <div class="drive-vrm-label">VRMモデル</div>
+            <div class="drive-row">
+              <button type="button" id="drive-upload-vrm-btn">↑ アップロード</button>
               <button type="button" id="drive-list-vrm-btn">↓ 一覧を取得</button>
             </div>
             <select id="drive-vrm-select" class="hidden">
               <option value="">-- モデルを選択 --</option>
             </select>
             <button type="button" id="drive-apply-vrm-btn" class="hidden">このモデルを読み込む</button>
+
             <span id="drive-status" class="hint"></span>
             <button type="button" id="drive-signout-btn" class="drive-signout">サインアウト</button>
           </div>

@@ -104,6 +104,52 @@ export class GoogleDriveSync {
     return res.arrayBuffer();
   }
 
+  // ---- 会話履歴 ----
+
+  async saveHistory(messages) {
+    this._requireAuth();
+    const data = { messages, savedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const fileId = await this._findFile('vrllm-history.json', 'appDataFolder');
+    if (fileId) {
+      await this._patchMedia(fileId, blob);
+    } else {
+      await this._multipartCreate('vrllm-history.json', blob, ['appDataFolder']);
+    }
+  }
+
+  async loadHistory() {
+    this._requireAuth();
+    const fileId = await this._findFile('vrllm-history.json', 'appDataFolder');
+    if (!fileId) return null;
+    const res = await this._fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+    if (!res.ok) throw new Error(`履歴読み込み失敗 (${res.status})`);
+    return res.json(); // { messages, savedAt }
+  }
+
+  // ---- キャラクタープリセット ----
+
+  async savePresets(presets) {
+    this._requireAuth();
+    const blob = new Blob([JSON.stringify({ presets }, null, 2)], { type: 'application/json' });
+    const fileId = await this._findFile('vrllm-presets.json', 'appDataFolder');
+    if (fileId) {
+      await this._patchMedia(fileId, blob);
+    } else {
+      await this._multipartCreate('vrllm-presets.json', blob, ['appDataFolder']);
+    }
+  }
+
+  async loadPresets() {
+    this._requireAuth();
+    const fileId = await this._findFile('vrllm-presets.json', 'appDataFolder');
+    if (!fileId) return [];
+    const res = await this._fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+    if (!res.ok) throw new Error(`プリセット読み込み失敗 (${res.status})`);
+    const data = await res.json();
+    return data.presets || [];
+  }
+
   // ---- 内部ヘルパー ----
 
   _requireAuth() {

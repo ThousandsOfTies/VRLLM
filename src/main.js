@@ -194,6 +194,7 @@ async function sendMessage(text) {
 
     // LLM完了 → パイプラインの残りを流して全再生完了まで待つ
     await pipeline.done({ lang: llm.ttsLang });
+    scheduleHistorySave();
 
   } catch (err) {
     textNode.textContent = `エラー: ${err.message}`;
@@ -354,6 +355,12 @@ settingsBtn.addEventListener('click', () => {
     const ttsMode = speech._useCloud ? '✅ Cloud API 使用中' :
                    speech._useAivis ? '✅ ローカル AivisSpeech 使用中' : '❌ ブラウザTTS使用中';
     document.getElementById('aivis-status').textContent = ttsMode;
+
+    // Drive サインイン済みなら自動保存チェックと、プリセットを更新
+    if (driveSync.isSignedIn) {
+      document.getElementById('drive-autosave-chk').checked = _autoSaveEnabled;
+      if (Date.now() - _presetsLastRefresh > 60_000) refreshPresets();
+    }
   }
 });
 
@@ -402,17 +409,71 @@ cancelSettingsBtn.addEventListener('click', () => {
 clearHistoryBtn.addEventListener('click', () => {
   llm.clearHistory();
   chatMessages.innerHTML = '';
+  clearTimeout(_autoSaveTimer); // 保存待ちタイマーもリセット
   setStatus('会話履歴をクリアしました');
   settingsPanel.classList.add('hidden');
 });
 
 // ---- Google Drive 同期 ----
 
+// 自動保存の状態
+let _autoSaveEnabled = localStorage.getItem('drive_autosave_history') === 'true';
+let _autoSaveTimer   = null;
+
+function scheduleHistorySave() {
+  if (!_autoSaveEnabled || !driveSync.isSignedIn) return;
+  clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(async () => {
+    try {
+      await driveSync.saveHistory(llm.history);
+      setStatus('履歴を自動保存しました');
+      setTimeout(() => { if (statusEl.textContent === '履歴を自動保存しました') setStatus(''); }, 3000);
+    } catch (err) {
+      console.warn('履歴自動保存失敗:', err.message);
+    }
+  }, 15_000); // 最後の返答から15秒後に保存
+}
+
+// プリセットのキャッシュ
+let _cachedPresets     = [];
+let _presetsLastRefresh = 0;
+
+async function refreshPresets() {
+  try {
+    _cachedPresets     = await driveSync.loadPresets();
+    _presetsLastRefresh = Date.now();
+    updatePresetSelect();
+  } catch (err) {
+    console.warn('プリセット読み込み失敗:', err.message);
+  }
+}
+
+function updatePresetSelect() {
+  const sel = document.getElementById('drive-preset-select');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">-- プリセットを選択 --</option>';
+  for (const p of _cachedPresets) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  }
+  if (current) sel.value = current;
+}
+
 const SYNC_KEYS = [
   'llm_endpoint', 'llm_api_key', 'llm_model', 'llm_system_prompt', 'llm_tts_lang',
   'aivis_url', 'aivis_speaker_id', 'aivis_cloud_api_key', 'aivis_cloud_model_uuid',
 ];
 
+const driveAutosaveChk       = document.getElementById('drive-autosave-chk');
+const driveSaveHistoryBtn    = document.getElementById('drive-save-history-btn');
+const driveLoadHistoryBtn    = document.getElementById('drive-load-history-btn');
+const drivePresetSelect      = document.getElementById('drive-preset-select');
+const drivePresetApplyBtn    = document.getElementById('drive-preset-apply-btn');
+const drivePresetDeleteBtn   = document.getElementById('drive-preset-delete-btn');
+const drivePresetNameInput   = document.getElementById('drive-preset-name-input');
+const drivePresetSaveBtn     = document.getElementById('drive-preset-save-btn');
 const driveSigninBtn     = document.getElementById('drive-signin-btn');
 const driveUiOut         = document.getElementById('drive-ui-out');
 const driveUiIn          = document.getElementById('drive-ui-in');
@@ -436,7 +497,13 @@ function updateDriveSyncUI(isSignedIn) {
   }
 }
 
-driveSync.onSignInChange = updateDriveSyncUI;
+driveSync.onSignInChange = (isSignedIn) => {
+  updateDriveSyncUI(isSignedIn);
+  if (isSignedIn) {
+    driveAutosaveChk.checked = _autoSaveEnabled;
+    refreshPresets();
+  }
+};
 driveSync.init().catch(err => console.warn('Drive sync init:', err));
 
 driveSigninBtn.addEventListener('click', () => {
@@ -449,7 +516,136 @@ driveSigninBtn.addEventListener('click', () => {
 
 driveSignoutBtn.addEventListener('click', () => {
   driveSync.signOut();
+  _cachedPresets = [];
   driveStatus.textContent = 'サインアウトしました';
+});
+
+// ---- 会話履歴 ----
+
+driveAutosaveChk.addEventListener('change', () => {
+  _autoSaveEnabled = driveAutosaveChk.checked;
+  localStorage.setItem('drive_autosave_history', String(_autoSaveEnabled));
+  if (!_autoSaveEnabled) clearTimeout(_autoSaveTimer);
+});
+
+driveSaveHistoryBtn.addEventListener('click', async () => {
+  driveStatus.textContent = '保存中...';
+  driveSaveHistoryBtn.disabled = true;
+  try {
+    await driveSync.saveHistory(llm.history);
+    driveStatus.textContent = `✅ 履歴を保存しました (${llm.history.length} 件)`;
+  } catch (err) {
+    driveStatus.textContent = `❌ ${err.message}`;
+    console.error(err);
+  } finally {
+    driveSaveHistoryBtn.disabled = false;
+  }
+});
+
+driveLoadHistoryBtn.addEventListener('click', async () => {
+  driveStatus.textContent = '読み込み中...';
+  driveLoadHistoryBtn.disabled = true;
+  try {
+    const data = await driveSync.loadHistory();
+    if (!data?.messages?.length) {
+      driveStatus.textContent = 'Drive に保存された履歴がありません';
+      return;
+    }
+    // 現在の履歴を置き換えて表示を再構築
+    llm.history = data.messages;
+    chatMessages.innerHTML = '';
+    for (const msg of data.messages) {
+      appendMessage(msg.role, msg.content);
+    }
+    const date = new Date(data.savedAt).toLocaleString('ja-JP');
+    driveStatus.textContent = `✅ 履歴を読み込みました (${data.messages.length} 件 / ${date})`;
+  } catch (err) {
+    driveStatus.textContent = `❌ ${err.message}`;
+    console.error(err);
+  } finally {
+    driveLoadHistoryBtn.disabled = false;
+  }
+});
+
+// ---- キャラクタープリセット ----
+
+drivePresetApplyBtn.addEventListener('click', () => {
+  const id = drivePresetSelect.value;
+  if (!id) { driveStatus.textContent = 'プリセットを選択してください'; return; }
+  const preset = _cachedPresets.find(p => p.id === id);
+  if (!preset) return;
+
+  llm.systemPrompt = preset.system_prompt;
+  llm.model        = preset.model;
+  llm.ttsLang      = preset.tts_lang;
+  llm.save();
+  localStorage.setItem('aivis_speaker_id',      preset.aivis_speaker_id || '');
+  localStorage.setItem('aivis_cloud_model_uuid', preset.aivis_cloud_model_uuid || '');
+  speech.updateAivisSettings('', preset.aivis_speaker_id || '');
+  speech.updateCloudSettings('', preset.aivis_cloud_model_uuid || '');
+
+  // フォームに反映
+  document.getElementById('setting-model').value             = llm.model;
+  document.getElementById('setting-system-prompt').value     = llm.systemPrompt;
+  document.getElementById('setting-tts-lang').value          = llm.ttsLang;
+  document.getElementById('setting-aivis-speaker').value     = preset.aivis_speaker_id || '';
+  document.getElementById('setting-cloud-model-uuid').value  = preset.aivis_cloud_model_uuid || '';
+
+  driveStatus.textContent = `✅ 「${preset.name}」を適用しました`;
+});
+
+drivePresetSaveBtn.addEventListener('click', async () => {
+  const name = drivePresetNameInput.value.trim();
+  if (!name) { driveStatus.textContent = 'プリセット名を入力してください'; return; }
+
+  const newPreset = {
+    id:                    `preset_${Date.now()}`,
+    name,
+    system_prompt:         document.getElementById('setting-system-prompt').value.trim() || llm.systemPrompt,
+    model:                 document.getElementById('setting-model').value.trim()         || llm.model,
+    tts_lang:              document.getElementById('setting-tts-lang').value             || llm.ttsLang,
+    aivis_speaker_id:      document.getElementById('setting-aivis-speaker').value.trim(),
+    aivis_cloud_model_uuid: document.getElementById('setting-cloud-model-uuid').value.trim(),
+  };
+
+  driveStatus.textContent = '保存中...';
+  drivePresetSaveBtn.disabled = true;
+  try {
+    _cachedPresets.push(newPreset);
+    await driveSync.savePresets(_cachedPresets);
+    updatePresetSelect();
+    drivePresetNameInput.value = '';
+    driveStatus.textContent = `✅ 「${name}」を保存しました`;
+  } catch (err) {
+    _cachedPresets.pop(); // ロールバック
+    driveStatus.textContent = `❌ ${err.message}`;
+    console.error(err);
+  } finally {
+    drivePresetSaveBtn.disabled = false;
+  }
+});
+
+drivePresetDeleteBtn.addEventListener('click', async () => {
+  const id = drivePresetSelect.value;
+  if (!id) { driveStatus.textContent = 'プリセットを選択してください'; return; }
+  const preset = _cachedPresets.find(p => p.id === id);
+  if (!preset) return;
+
+  driveStatus.textContent = '削除中...';
+  drivePresetDeleteBtn.disabled = true;
+  const prev = [..._cachedPresets];
+  try {
+    _cachedPresets = _cachedPresets.filter(p => p.id !== id);
+    await driveSync.savePresets(_cachedPresets);
+    updatePresetSelect();
+    driveStatus.textContent = `✅ 「${preset.name}」を削除しました`;
+  } catch (err) {
+    _cachedPresets = prev; // ロールバック
+    driveStatus.textContent = `❌ ${err.message}`;
+    console.error(err);
+  } finally {
+    drivePresetDeleteBtn.disabled = false;
+  }
 });
 
 driveSaveBtn.addEventListener('click', async () => {
@@ -598,6 +794,14 @@ driveApplyVrmBtn.addEventListener('click', async () => {
     loadVrmBtn.disabled = false;
   }
 });
+
+// ---- PWA: Service Worker 登録 ----
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`)
+      .catch(err => console.warn('SW 登録失敗:', err));
+  });
+}
 
 // ---- ウィンドウリサイズ ----
 window.addEventListener('resize', () => viewer.resize());
