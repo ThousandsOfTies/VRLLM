@@ -1,5 +1,7 @@
 # VRLLM — VRoid AI アシスタント
 
+**https://thousandsofties.github.io/VRLLM/**
+
 VRM キャラクターと LLM を組み合わせた AI アシスタント Web アプリです。
 ブラウザだけで動作し、スマートフォンからも利用できます。
 
