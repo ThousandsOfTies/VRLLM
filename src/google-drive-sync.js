@@ -192,6 +192,12 @@ export class GoogleDriveSync {
     return res.arrayBuffer();
   }
 
+  async deleteVRM(fileId) {
+    this._requireAuth();
+    const res = await this._fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`VRM削除失敗 (${res.status})`);
+  }
+
   // ---- 会話履歴 ----
 
   async saveHistory(messages) {

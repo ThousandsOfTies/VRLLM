@@ -97,4 +97,8 @@ export class LocalStorage {
     if (!record) throw new Error(`VRMファイルが見つかりません: ${fileId}`);
     return record.data;
   }
+
+  async deleteVRM(fileId) {
+    await this._kv('vrm-files', 'readwrite', s => s.delete(fileId));
+  }
 }

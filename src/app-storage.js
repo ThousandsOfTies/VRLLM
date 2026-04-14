@@ -28,4 +28,5 @@ export class AppStorage {
   uploadVRM(file, onProgress) { return this._b.uploadVRM(file, onProgress); }
   listVRMFiles()              { return this._b.listVRMFiles(); }
   downloadVRM(fileId)         { return this._b.downloadVRM(fileId); }
+  deleteVRM(fileId)           { return this._b.deleteVRM(fileId); }
 }

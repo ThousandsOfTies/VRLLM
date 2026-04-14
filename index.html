@@ -80,9 +80,18 @@
         <div class="tab-panel active" id="tab-chara">
           <label>
             VRMモデル
-            <button type="button" id="load-vrm-btn">📁 VRMファイルを読み込む</button>
-            <span id="vrm-load-status" class="hint"></span>
+            <select id="vrm-model-select">
+              <option value="__add__">＋ モデルを追加</option>
+            </select>
           </label>
+          <div id="vrm-edit-row" class="hidden">
+            <label>
+              キャラ名
+              <input type="text" id="vrm-char-name" placeholder="表示名を入力">
+            </label>
+            <button type="button" id="vrm-delete-btn">🗑 削除</button>
+          </div>
+          <span id="vrm-load-status" class="hint"></span>
           <label>
             システムプロンプト
             <textarea id="setting-system-prompt" rows="6"></textarea>

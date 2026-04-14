@@ -19,7 +19,7 @@ const local   = new LocalStorage();
 const storage = new AppStorage(driveSync, local);
 
 // ---- DOM 参照 ----
-const loadVrmBtn = document.getElementById('load-vrm-btn');
+const vrmModelSelect = document.getElementById('vrm-model-select');
 const vrmFileInput = document.getElementById('vrm-file-input');
 const loadVRMABtn = document.getElementById('load-vrma-btn');
 const vrmaFileInput = document.getElementById('vrma-file-input');
@@ -37,11 +37,119 @@ const statusEl = document.getElementById('status-indicator');
 const vrmLoadStatus = document.getElementById('vrm-load-status');
 
 // ---- VRM 読み込み ----
-loadVrmBtn.addEventListener('click', () => vrmFileInput.click());
+
+let _currentVrmId = null;  // 現在選択中のVRM ID（null = ビルトイン）
+let _vrmCharNames  = {};   // { [fileId]: string } 各モデルの表示名
+let _vrmFileNames  = {};   // { [fileId]: string } 各モデルの元ファイル名
+
+async function refreshVRMList(selectId = undefined) {
+  let files = [];
+  try {
+    files = await storage.listVRMFiles();
+  } catch (err) {
+    console.warn('VRMリスト取得失敗:', err.message);
+  }
+  _vrmFileNames = {};
+  vrmModelSelect.innerHTML = '';
+  for (const f of files) {
+    _vrmFileNames[f.id] = f.name;
+    const opt = document.createElement('option');
+    opt.value = f.id;
+    opt.textContent = _vrmCharNames[f.id] || f.name;
+    vrmModelSelect.appendChild(opt);
+  }
+  const addOpt = document.createElement('option');
+  addOpt.value = '__add__';
+  addOpt.textContent = '＋ モデルを追加';
+  vrmModelSelect.appendChild(addOpt);
+
+  if (selectId !== undefined) {
+    vrmModelSelect.value = selectId;
+    if (selectId !== '__add__') _currentVrmId = selectId;
+  } else if (_currentVrmId && vrmModelSelect.querySelector(`option[value="${_currentVrmId}"]`)) {
+    vrmModelSelect.value = _currentVrmId;
+  }
+  _updateVrmEditRow();
+}
+
+function _updateVrmEditRow() {
+  const val = vrmModelSelect.value;
+  const editRow = document.getElementById('vrm-edit-row');
+  const charNameInput = document.getElementById('vrm-char-name');
+  if (val && val !== '__add__') {
+    editRow.classList.remove('hidden');
+    charNameInput.value = _vrmCharNames[val] || '';
+    charNameInput.placeholder = _vrmFileNames[val] || '表示名を入力';
+  } else {
+    editRow.classList.add('hidden');
+  }
+}
+
+document.getElementById('vrm-char-name').addEventListener('change', async (e) => {
+  if (!_currentVrmId) return;
+  const name = e.target.value.trim();
+  if (name) {
+    _vrmCharNames[_currentVrmId] = name;
+  } else {
+    delete _vrmCharNames[_currentVrmId];
+  }
+  await refreshVRMList(_currentVrmId);
+  storage.saveSettings(collectSettings()).catch(err => console.warn('設定保存失敗:', err.message));
+});
+
+document.getElementById('vrm-delete-btn').addEventListener('click', async () => {
+  if (!_currentVrmId) return;
+  const dispName = _vrmCharNames[_currentVrmId] || _vrmFileNames[_currentVrmId] || _currentVrmId;
+  if (!confirm(`「${dispName}」を削除しますか？`)) return;
+  try {
+    await storage.deleteVRM(_currentVrmId);
+    delete _vrmCharNames[_currentVrmId];
+    delete _vrmFileNames[_currentVrmId];
+    _currentVrmId = null;
+    vrmLoadStatus.textContent = '';
+    await refreshVRMList();
+    storage.saveSettings(collectSettings()).catch(() => {});
+  } catch (err) {
+    vrmLoadStatus.textContent = `❌ ${err.message}`;
+    console.error(err);
+  }
+});
+
+vrmModelSelect.addEventListener('change', async (e) => {
+  const val = e.target.value;
+  if (val === '__add__') {
+    _updateVrmEditRow();
+    vrmFileInput.click();
+    return;
+  }
+  _currentVrmId = val;
+  _updateVrmEditRow();
+  vrmModelSelect.disabled = true;
+  vrmLoadStatus.textContent = '読み込み中...';
+  try {
+    const buf = await storage.downloadVRM(val);
+    const fname = _vrmFileNames[val] || val;
+    const file = new File([buf], fname, { type: 'application/octet-stream' });
+    await viewer.loadVRM(file, (pct) => { vrmLoadStatus.textContent = `読み込み中... ${pct}%`; });
+    vrmLoadStatus.textContent = `✅ ${_vrmCharNames[val] || fname}`;
+    setStatus('');
+    try {
+      await viewer.loadVRMA(import.meta.env.BASE_URL + 'vrma/VRMA_03.vrma', { loop: true });
+      vrmaPresetSelect.value = 'vrma/VRMA_03.vrma';
+    } catch (vrmaErr) {
+      console.warn('デフォルトモーション読み込み失敗:', vrmaErr.message);
+    }
+  } catch (err) {
+    vrmLoadStatus.textContent = `❌ ${err.message}`;
+    console.error(err);
+  } finally {
+    vrmModelSelect.disabled = false;
+  }
+});
 
 async function loadBuiltinVRM() {
   setStatus('モデルを読み込み中...');
-  loadVrmBtn.disabled = true;
+  vrmModelSelect.disabled = true;
   try {
     await viewer.loadVRM(import.meta.env.BASE_URL + 'vrm/Lilym.vrm', (pct) => setStatus(`読み込み中... ${pct}%`));
     setStatus('デフォルトモーション適用中...');
@@ -52,35 +160,47 @@ async function loadBuiltinVRM() {
     setStatus(`モデル読み込みエラー: ${err.message}`);
     console.error(err);
   } finally {
-    loadVrmBtn.disabled = false;
+    vrmModelSelect.disabled = false;
   }
 }
 
 vrmFileInput.addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  loadVrmBtn.disabled = true;
-  vrmLoadStatus.textContent = '読み込み中...';
+  vrmModelSelect.disabled = true;
+  vrmLoadStatus.textContent = '保存中...';
   try {
+    await storage.uploadVRM(file, () => {});
+    vrmLoadStatus.textContent = '読み込み中...';
     await viewer.loadVRM(file, (pct) => { vrmLoadStatus.textContent = `読み込み中... ${pct}%`; });
     vrmLoadStatus.textContent = `✅ ${file.name}`;
     setStatus('');
   } catch (err) {
     vrmLoadStatus.textContent = `❌ ${err.message}`;
     console.error(err);
-    loadVrmBtn.disabled = false;
+    vrmModelSelect.disabled = false;
     vrmFileInput.value = '';
     return;
   }
+  // リストを更新して追加したモデルを選択
+  await refreshVRMList();
+  // 追加したファイル名でIDを探して選択
+  const found = Array.from(vrmModelSelect.options).find(
+    o => o.value !== '__add__' && _vrmFileNames[o.value] === file.name
+  );
+  if (found) {
+    vrmModelSelect.value = found.value;
+    _currentVrmId = found.value;
+    _updateVrmEditRow();
+  }
   // デフォルトモーション
   try {
-    const vrmaUrl = import.meta.env.BASE_URL + 'vrma/VRMA_03.vrma';
-    await viewer.loadVRMA(vrmaUrl, { loop: true });
+    await viewer.loadVRMA(import.meta.env.BASE_URL + 'vrma/VRMA_03.vrma', { loop: true });
     vrmaPresetSelect.value = 'vrma/VRMA_03.vrma';
   } catch (vrmaErr) {
     console.warn('デフォルトモーション読み込み失敗:', vrmaErr.message);
   } finally {
-    loadVrmBtn.disabled = false;
+    vrmModelSelect.disabled = false;
     vrmFileInput.value = '';
   }
 });
@@ -367,6 +487,8 @@ settingsBtn.addEventListener('click', () => {
                    speech._useAivis ? '✅ ローカル AivisSpeech 使用中' : '❌ ブラウザTTS使用中';
     document.getElementById('aivis-status').textContent = ttsMode;
 
+    // VRMリストを更新
+    refreshVRMList();
     // Drive サインイン済みなら自動保存チェックと、プリセットを更新
     if (driveSync.isSignedIn) {
       document.getElementById('drive-autosave-chk').checked = _autoSaveEnabled;
@@ -436,6 +558,7 @@ function collectSettings() {
     ...llm.getSettings(),
     ...speech.getSettings(),
     autosave_history: String(_autoSaveEnabled),
+    vrm_char_names: JSON.stringify(_vrmCharNames),
   };
 }
 
@@ -444,6 +567,9 @@ function applySettings(s) {
   llm.applySettings(s);
   speech.applySettings(s);
   if (s.autosave_history !== undefined) _autoSaveEnabled = s.autosave_history === 'true';
+  if (s.vrm_char_names) {
+    try { _vrmCharNames = JSON.parse(s.vrm_char_names); } catch { _vrmCharNames = {}; }
+  }
 }
 
 function scheduleHistorySave() {
