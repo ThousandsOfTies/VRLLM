@@ -107,8 +107,8 @@ export class TTSPipeline {
    * @param {boolean} force 残り全てを強制的に処理する
    */
   _extractSentences(force) {
-    // 日本語句読点・改行・英語文末を区切りとする
-    const re = /[。！？\n]|[.!?](?=\s|$)/g;
+    // 日本語句読点・改行・英語文末を区切りとする (連続する記号も1つのまとまりにする)
+    const re = /[。！？\n]+|[.!?]+(?=\s|$)/g;
     let lastEnd = 0;
     let match;
 

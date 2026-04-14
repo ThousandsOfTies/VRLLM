@@ -371,10 +371,11 @@ async function sendMessage(text) {
       // 別のメッセージで割り込まれた場合は中断
       if (_activePipeline !== pipeline) break;
 
+      const wasNearBottom = isNearBottom();
       fullResponse += chunk;
       pipeline.push(chunk);
       textNode.textContent = fullResponse.replace(/^\s+/, '');
-      scrollToBottom();
+      if (wasNearBottom) scrollToBottom(true);
     }
 
     const spokenText = fullResponse.trim();

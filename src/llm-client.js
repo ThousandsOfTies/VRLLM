@@ -124,20 +124,29 @@ export class LLMClient {
           if (!emotionParsed) {
             prefixBuf += delta;
 
-            // [EMO:xxx] タグを検索
-            const match = prefixBuf.match(/^\[EMO:([^\]]+)\]\s*/);
-            if (match) {
-              // 感情を通知
-              this.onEmotionDetected?.(match[1].trim().toLowerCase());
-              emotionParsed = true;
-              // タグを除いた残りを出力
-              const rest = prefixBuf.slice(match[0].length);
-              if (rest) {
-                assistantMessage += rest;
-                yield rest;
+            // 先頭の [EMO:xxx] タグ群を処理
+            if (/^\s*\[/.test(prefixBuf) || prefixBuf.trim() === '') {
+              let m;
+              while ((m = prefixBuf.match(/\[EMO:([^\]]+)\]\s*/))) {
+                this.onEmotionDetected?.(m[1].trim().toLowerCase());
+                prefixBuf = prefixBuf.replace(m[0], '');
               }
-            } else if (prefixBuf.length > 40 || prefixBuf.includes('\n')) {
-              // タグがないまま一定量溜まったらそのまま出力
+              // まだ開始ブラケットがある、またはバッファが空（次の文字待ち）の場合は処理を保留
+              if (/^\s*\[/.test(prefixBuf) || prefixBuf.trim() === '') {
+                if (prefixBuf.length > 80 || prefixBuf.includes('\n')) {
+                  // 諦めて出力
+                  emotionParsed = true;
+                  assistantMessage += prefixBuf;
+                  yield prefixBuf;
+                }
+              } else {
+                // タグではない通常文字が始まったので通常出力に切り替え
+                emotionParsed = true;
+                assistantMessage += prefixBuf;
+                yield prefixBuf;
+              }
+            } else {
+              // そもそもブラケット始まりではなかった
               emotionParsed = true;
               assistantMessage += prefixBuf;
               yield prefixBuf;

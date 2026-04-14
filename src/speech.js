@@ -109,17 +109,20 @@ export class SpeechManager {
     this._recognition.interimResults = false;
 
     this._recognition.onresult = (e) => {
+      clearTimeout(this._recognitionTimer);
       const text = e.results[0][0].transcript;
       this.isListening = false;
       this.onTranscript?.(text);
     };
 
     this._recognition.onend = () => {
+      clearTimeout(this._recognitionTimer);
       this.isListening = false;
       this.onListeningEnd?.();
     };
 
     this._recognition.onerror = (e) => {
+      clearTimeout(this._recognitionTimer);
       console.error('STT エラー:', e.error);
       this.isListening = false;
     };
@@ -133,10 +136,20 @@ export class SpeechManager {
     if (!this._recognition || this.isListening) return;
     this._recognition.start();
     this.isListening = true;
+
+    // セーフティネット: 一定時間(15秒)経っても終了しない場合は強制停止
+    clearTimeout(this._recognitionTimer);
+    this._recognitionTimer = setTimeout(() => {
+      if (this.isListening) {
+        console.warn('[STT] 無音タイムアウトにより強制終了');
+        this.stopListening();
+      }
+    }, 15000);
   }
 
   stopListening() {
     if (!this._recognition || !this.isListening) return;
+    clearTimeout(this._recognitionTimer);
     this._recognition.stop();
     this.isListening = false;
   }

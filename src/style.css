@@ -30,7 +30,7 @@ body {
 #viewer-panel {
   flex: 1;
   position: relative;
-  background: linear-gradient(160deg, #12122a 0%, #0d1526 100%);
+  background: url('/bg.png') center center / cover no-repeat, linear-gradient(160deg, #12122a 0%, #0d1526 100%);
   min-width: 0;
   transition: background 0.3s;
 }
