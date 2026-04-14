@@ -507,26 +507,55 @@ const driveSignoutBtn    = document.getElementById('drive-signout-btn');
 const driveStatus        = document.getElementById('drive-status');
 const driveVrmUploadInput = document.getElementById('drive-vrm-upload-input');
 
+// Googleスタイルのイニシャルアバター用カラーパレット
+const AVATAR_COLORS = [
+  '#F44336','#E91E63','#9C27B0','#673AB7','#3F51B5',
+  '#2196F3','#0097A7','#00897B','#43A047','#FB8C00','#F4511E',
+];
+function avatarColorFromName(name) {
+  if (!name) return '#7a90ff';
+  const code = [...name].reduce((s, c) => s + c.charCodeAt(0), 0);
+  return AVATAR_COLORS[code % AVATAR_COLORS.length];
+}
+function getInitials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return parts[0].slice(0, 2).toUpperCase();
+}
+
 function updateDriveSyncUI(isSignedIn) {
   // ヘッダーのサインインボタン ↔ アバターを切り替え
   driveSigninBtn.classList.toggle('hidden', isSignedIn);
   driveUiIn.classList.toggle('hidden', !isSignedIn);
 
+  const img      = document.getElementById('sync-avatar-img');
+  const initials = document.getElementById('sync-avatar-initials');
+
   if (isSignedIn) {
-    const img = document.getElementById('sync-avatar-img');
+    // イニシャルをセット（画像が読めなかった場合のフォールバック）
+    const name = driveSync.name;
+    initials.textContent = getInitials(name);
+    initials.style.background = avatarColorFromName(name);
+    initials.style.display = '';
+
     const pic = driveSync.picture;
     if (pic) {
       img.src = pic;
       img.onload = () => {
         img.classList.add('loaded');
-        img.nextElementSibling.style.display = 'none'; // fallback を隠す
+        initials.style.display = 'none';
+      };
+      img.onerror = () => {
+        img.classList.remove('loaded');
+        initials.style.display = '';
       };
     }
   } else {
-    const img = document.getElementById('sync-avatar-img');
     img.src = '';
     img.classList.remove('loaded');
-    img.nextElementSibling.style.display = '';
+    initials.textContent = '';
+    initials.style.display = '';
     driveVrmSelect.classList.add('hidden');
     driveApplyVrmBtn.classList.add('hidden');
     driveStatus.textContent = '';

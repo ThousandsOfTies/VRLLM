@@ -12,6 +12,7 @@ export class GoogleDriveSync {
     this._tokenClient = null;
     this._tokenExpiry = 0; // Unix ms
     this._email = null;
+    this._name = null;
     this._picture = null;
     this.onSignInChange = null; // callback(isSignedIn: boolean)
   }
@@ -49,6 +50,7 @@ export class GoogleDriveSync {
         token:   this._token,
         expiry:  this._tokenExpiry,
         email:   this._email,
+        name:    this._name,
         picture: this._picture,
       }));
     } catch (_) {}
@@ -66,13 +68,14 @@ export class GoogleDriveSync {
       saved = JSON.parse(raw);
     } catch (_) { return; }
 
-    const { token, expiry, email, picture } = saved;
+    const { token, expiry, email, name, picture } = saved;
 
     // トークンがまだ有効期限内の場合はそのまま復元
     if (token && expiry && Date.now() < expiry) {
       this._token       = token;
       this._tokenExpiry = expiry;
       this._email       = email   ?? null;
+      this._name        = name    ?? null;
       this._picture     = picture ?? null;
       this.onSignInChange?.(true);
       return;
@@ -86,6 +89,7 @@ export class GoogleDriveSync {
   }
 
   get picture() { return this._picture; }
+  get name()    { return this._name; }
 
   async _fetchAndSaveEmail() {
     try {
@@ -95,6 +99,7 @@ export class GoogleDriveSync {
       if (res.ok) {
         const info = await res.json();
         this._email   = info.email   ?? null;
+        this._name    = info.name    ?? null;
         this._picture = info.picture ?? null;
       }
     } catch (_) {}

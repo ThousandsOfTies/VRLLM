@@ -465,8 +465,19 @@ body {
 .sync-avatar-img.loaded { display: block; }
 
 .sync-avatar-fallback {
-  font-size: 18px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: #7a90ff;
   line-height: 1;
+  letter-spacing: 0;
+  user-select: none;
 }
 
 /* ---- 設定タブ ---- */
