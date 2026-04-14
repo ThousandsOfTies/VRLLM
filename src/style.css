@@ -371,20 +371,6 @@ body {
 #vrma-preset-select:focus { outline: none; border-color: #6c7aff; }
 #vrma-preset-select option { background: #1a1a2e; color: #e8e8f8; }
 
-#load-vrm-btn {
-  background: #1a1a30;
-  color: #b8b0ff;
-  border: 1px solid #3a3a60;
-  padding: 8px 14px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: background 0.2s;
-  text-align: left;
-}
-#load-vrm-btn:hover:not(:disabled) { background: #22223a; }
-#load-vrm-btn:disabled { opacity: 0.5; cursor: default; }
-
 #aivis-check-btn {
   background: #1a2a1a;
   color: #6c6;
@@ -560,55 +546,8 @@ body {
 }
 #vrm-delete-btn:hover { background: #3a1010; }
 
-/* ---- Google Drive 同期セクション ---- */
-.drive-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  background: #0e0e22;
-  border: 1px solid #2a2a48;
-  border-radius: 10px;
-}
-
-.drive-section-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: #666;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  margin-top: 6px;
-}
-
-.drive-signed-in-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-
-.drive-signed-in-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #7a90ff;
-}
-
-.drive-vrm-label {
-  font-size: 11px;
-  color: #666;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  margin-top: 4px;
-}
-
-.drive-row {
-  display: flex;
-  gap: 6px;
-}
-
-.drive-row button,
+/* ---- Google Drive サインインボタン ---- */
 #drive-signin-btn {
-  flex: 1;
   background: #1a1a32;
   color: #b8b0ff;
   border: 1px solid #3a3a60;
@@ -620,33 +559,7 @@ body {
   transition: background 0.2s;
   white-space: nowrap;
 }
-.drive-row button:hover:not(:disabled),
-#drive-signin-btn:hover {
-  background: #22223a;
-}
-.drive-row button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-#drive-vrm-select {
-  width: 100%;
-}
-
-#drive-apply-vrm-btn {
-  width: 100%;
-  background: #1a2a3a;
-  color: #7ac0ff;
-  border: 1px solid #2a4a6a;
-  padding: 8px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  transition: background 0.2s;
-}
-#drive-apply-vrm-btn:hover:not(:disabled) { background: #1e3045; }
-#drive-apply-vrm-btn:disabled { opacity: 0.5; cursor: default; }
+#drive-signin-btn:hover { background: #22223a; }
 
 /* トグルスイッチ */
 .drive-toggle-label {
