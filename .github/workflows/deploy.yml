@@ -34,11 +34,6 @@ jobs:
         env:
           GITHUB_PAGES: true
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-          VITE_AIVIS_CLOUD_API_KEY: ${{ secrets.VITE_AIVIS_CLOUD_API_KEY }}
-          VITE_AIVIS_CLOUD_MODEL_UUID: ${{ secrets.VITE_AIVIS_CLOUD_MODEL_UUID }}
-          VITE_LLM_ENDPOINT: https://generativelanguage.googleapis.com/v1beta/openai/
-          VITE_LLM_API_KEY: ${{ secrets.VITE_LLM_API_KEY }}
-          VITE_LLM_MODEL: gemini-2.5-flash
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
