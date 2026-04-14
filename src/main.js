@@ -791,9 +791,12 @@ async function initApp() {
 initApp().catch(err => console.warn('App init error:', err));
 
 // ---- スクリーンロック防止 (Wake Lock API) ----
+// モバイルブラウザはユーザー操作後でないと取得できないため、
+// ページロード時と最初のユーザー操作時の両方で取得を試みる
 let _wakeLock = null;
 async function acquireWakeLock() {
   if (!('wakeLock' in navigator)) return;
+  if (_wakeLock?.released === false) return; // 既に有効
   try {
     _wakeLock = await navigator.wakeLock.request('screen');
   } catch (err) {
@@ -801,6 +804,8 @@ async function acquireWakeLock() {
   }
 }
 acquireWakeLock();
+// 最初のユーザー操作時に再試行（モバイル対応）
+document.addEventListener('pointerdown', acquireWakeLock, { once: true });
 // タブが再び表示されたとき（ロック解除後など）に再取得
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') acquireWakeLock();
