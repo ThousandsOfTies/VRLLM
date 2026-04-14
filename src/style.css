@@ -270,8 +270,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-height: 90dvh;
-  overflow-y: auto;
+  height: 90dvh;
+  overflow: hidden;
 }
 
 
@@ -517,6 +517,23 @@ body {
 }
 .tab-panel.active {
   display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* キャラタブ：テキストエリアを残り領域に広げる */
+#tab-chara.active {
+  overflow: hidden;
+}
+#tab-chara > label:last-child {
+  flex: 1;
+  min-height: 0;
+}
+#setting-system-prompt {
+  flex: 1;
+  resize: none;
+  min-height: 100px;
 }
 
 /* ---- VRM 編集行 ---- */
