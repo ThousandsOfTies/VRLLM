@@ -765,7 +765,6 @@ driveSync.onSignInChange = (isSignedIn) => {
         }
       }
 
-      await refreshPresets();
       driveStatus.textContent = '✅ Drive から設定を読み込みました';
       setTimeout(() => { if (driveStatus.textContent.includes('読み込みました')) driveStatus.textContent = ''; }, 3000);
     }).catch(err => {
