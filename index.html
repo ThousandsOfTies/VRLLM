@@ -154,56 +154,13 @@
 
         <!-- 同期タブ -->
         <div class="tab-panel" id="tab-sync">
-          <div class="drive-section">
-            <!-- 設定同期 -->
-            <div class="drive-section-title">設定</div>
-            <div class="drive-row">
-              <button type="button" id="drive-save-btn">↑ 保存</button>
-              <button type="button" id="drive-load-btn">↓ 読み込み</button>
-            </div>
-
-            <!-- 会話履歴 -->
-            <div class="drive-section-title">会話履歴</div>
-            <div class="drive-row" style="align-items:center">
-              <label class="drive-toggle-label">
-                <input type="checkbox" id="drive-autosave-chk">
-                <span class="drive-toggle-track"><span class="drive-toggle-thumb"></span></span>
-                <span>自動保存</span>
-              </label>
-              <button type="button" id="drive-save-history-btn">今すぐ保存</button>
-              <button type="button" id="drive-load-history-btn">読み込む</button>
-            </div>
-
-            <!-- キャラクタープリセット -->
-            <div class="drive-section-title">キャラクタープリセット</div>
-            <div class="drive-row">
-              <select id="drive-preset-select" style="flex:1">
-                <option value="">-- プリセットを選択 --</option>
-              </select>
-              <button type="button" id="drive-preset-apply-btn">適用</button>
-              <button type="button" id="drive-preset-delete-btn">削除</button>
-            </div>
-            <div class="drive-row">
-              <input type="text" id="drive-preset-name-input" placeholder="プリセット名...">
-              <button type="button" id="drive-preset-save-btn">現在の設定を保存</button>
-            </div>
-
-            <!-- VRMモデル -->
-            <div class="drive-section-title">VRMモデル</div>
-            <div class="drive-row">
-              <button type="button" id="drive-upload-vrm-btn">↑ アップロード</button>
-              <button type="button" id="drive-list-vrm-btn">↓ 一覧を取得</button>
-            </div>
-            <select id="drive-vrm-select" class="hidden">
-              <option value="">-- モデルを選択 --</option>
-            </select>
-            <button type="button" id="drive-apply-vrm-btn" class="hidden">このモデルを読み込む</button>
-
-            <span id="drive-status" class="hint"></span>
-          </div>
+          <label class="drive-toggle-label">
+            <input type="checkbox" id="drive-autosave-chk">
+            <span class="drive-toggle-track"><span class="drive-toggle-thumb"></span></span>
+            <span>会話履歴の自動保存</span>
+          </label>
+          <span id="drive-status" class="hint"></span>
         </div>
-
-        <input type="file" id="drive-vrm-upload-input" accept=".vrm" hidden>
 
         <!-- 共通アクション -->
         <div class="settings-actions">
