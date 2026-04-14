@@ -38,9 +38,9 @@ const vrmLoadStatus = document.getElementById('vrm-load-status');
 
 // ---- VRM 読み込み ----
 
-let _currentVrmId = null;  // 現在選択中のVRM ID（null = ビルトイン）
-let _vrmCharNames  = {};   // { [fileId]: string } 各モデルの表示名
-let _vrmFileNames  = {};   // { [fileId]: string } 各モデルの元ファイル名
+let _currentVrmId = '__builtin__'; // 現在選択中のVRM ID（__builtin__ = リリム）
+let _vrmCharNames  = {};           // { [fileId]: string } 各モデルの表示名
+let _vrmFileNames  = {};           // { [fileId]: string } 各モデルの元ファイル名
 
 async function refreshVRMList(selectId = undefined) {
   let files = [];
@@ -51,6 +51,13 @@ async function refreshVRMList(selectId = undefined) {
   }
   _vrmFileNames = {};
   vrmModelSelect.innerHTML = '';
+
+  // リリム（ビルトイン）を先頭に固定
+  const builtinOpt = document.createElement('option');
+  builtinOpt.value = '__builtin__';
+  builtinOpt.textContent = 'リリム (デフォルト)';
+  vrmModelSelect.appendChild(builtinOpt);
+
   for (const f of files) {
     _vrmFileNames[f.id] = f.name;
     const opt = document.createElement('option');
@@ -58,6 +65,8 @@ async function refreshVRMList(selectId = undefined) {
     opt.textContent = _vrmCharNames[f.id] || f.name;
     vrmModelSelect.appendChild(opt);
   }
+
+  // 「モデルを追加」は常に末尾
   const addOpt = document.createElement('option');
   addOpt.value = '__add__';
   addOpt.textContent = '＋ モデルを追加';
@@ -76,7 +85,7 @@ function _updateVrmEditRow() {
   const val = vrmModelSelect.value;
   const editRow = document.getElementById('vrm-edit-row');
   const charNameInput = document.getElementById('vrm-char-name');
-  if (val && val !== '__add__') {
+  if (val && val !== '__add__' && val !== '__builtin__') {
     editRow.classList.remove('hidden');
     charNameInput.value = _vrmCharNames[val] || '';
     charNameInput.placeholder = _vrmFileNames[val] || '表示名を入力';
@@ -86,7 +95,7 @@ function _updateVrmEditRow() {
 }
 
 document.getElementById('vrm-char-name').addEventListener('change', async (e) => {
-  if (!_currentVrmId) return;
+  if (!_currentVrmId || _currentVrmId === '__builtin__') return;
   const name = e.target.value.trim();
   if (name) {
     _vrmCharNames[_currentVrmId] = name;
@@ -98,16 +107,16 @@ document.getElementById('vrm-char-name').addEventListener('change', async (e) =>
 });
 
 document.getElementById('vrm-delete-btn').addEventListener('click', async () => {
-  if (!_currentVrmId) return;
+  if (!_currentVrmId || _currentVrmId === '__builtin__') return;
   const dispName = _vrmCharNames[_currentVrmId] || _vrmFileNames[_currentVrmId] || _currentVrmId;
   if (!confirm(`「${dispName}」を削除しますか？`)) return;
   try {
     await storage.deleteVRM(_currentVrmId);
     delete _vrmCharNames[_currentVrmId];
     delete _vrmFileNames[_currentVrmId];
-    _currentVrmId = null;
+    _currentVrmId = '__builtin__';
     vrmLoadStatus.textContent = '';
-    await refreshVRMList();
+    await refreshVRMList('__builtin__');
     storage.saveSettings(collectSettings()).catch(() => {});
   } catch (err) {
     vrmLoadStatus.textContent = `❌ ${err.message}`;
@@ -115,11 +124,24 @@ document.getElementById('vrm-delete-btn').addEventListener('click', async () => 
   }
 });
 
-vrmModelSelect.addEventListener('change', async (e) => {
+// change ハンドラ：「モデルを追加」の場合は同期的にピッカーを開く
+vrmModelSelect.addEventListener('change', (e) => {
   const val = e.target.value;
   if (val === '__add__') {
+    // ユーザージェスチャーを維持するため同期的に click を呼ぶ
+    vrmModelSelect.value = _currentVrmId;
     _updateVrmEditRow();
     vrmFileInput.click();
+    return;
+  }
+  _handleVrmSelect(val);
+});
+
+async function _handleVrmSelect(val) {
+  if (val === '__builtin__') {
+    _currentVrmId = '__builtin__';
+    _updateVrmEditRow();
+    await loadBuiltinVRM();
     return;
   }
   _currentVrmId = val;
@@ -145,7 +167,7 @@ vrmModelSelect.addEventListener('change', async (e) => {
   } finally {
     vrmModelSelect.disabled = false;
   }
-});
+}
 
 async function loadBuiltinVRM() {
   setStatus('モデルを読み込み中...');
@@ -184,9 +206,8 @@ vrmFileInput.addEventListener('change', async (e) => {
   }
   // リストを更新して追加したモデルを選択
   await refreshVRMList();
-  // 追加したファイル名でIDを探して選択
   const found = Array.from(vrmModelSelect.options).find(
-    o => o.value !== '__add__' && _vrmFileNames[o.value] === file.name
+    o => o.value !== '__add__' && o.value !== '__builtin__' && _vrmFileNames[o.value] === file.name
   );
   if (found) {
     vrmModelSelect.value = found.value;
