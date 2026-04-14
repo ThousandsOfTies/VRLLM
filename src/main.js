@@ -38,9 +38,10 @@ const vrmLoadStatus = document.getElementById('vrm-load-status');
 
 // ---- VRM 読み込み ----
 
-let _currentVrmId = '__builtin__'; // 現在選択中のVRM ID（__builtin__ = リリム）
-let _vrmCharNames  = {};           // { [fileId]: string } 各モデルの表示名
-let _vrmFileNames  = {};           // { [fileId]: string } 各モデルの元ファイル名
+let _currentVrmId      = '__builtin__'; // 現在選択中のVRM ID（__builtin__ = リリム）
+let _vrmCharNames      = {};           // { [fileId]: string } 各モデルの表示名
+let _vrmFileNames      = {};           // { [fileId]: string } 各モデルの元ファイル名
+let _vrmSystemPrompts  = {};           // { [fileId]: string } 各モデルのシステムプロンプト
 
 async function refreshVRMList(selectId = undefined) {
   let files = [];
@@ -114,6 +115,7 @@ document.getElementById('vrm-delete-btn').addEventListener('click', async () => 
     await storage.deleteVRM(_currentVrmId);
     delete _vrmCharNames[_currentVrmId];
     delete _vrmFileNames[_currentVrmId];
+    delete _vrmSystemPrompts[_currentVrmId];
     _currentVrmId = '__builtin__';
     vrmLoadStatus.textContent = '';
     await refreshVRMList('__builtin__');
@@ -137,16 +139,31 @@ vrmModelSelect.addEventListener('change', (e) => {
   _handleVrmSelect(val);
 });
 
+function _applyVrmSystemPrompt(vrmId) {
+  const prompt = _vrmSystemPrompts[vrmId] ?? llm.systemPrompt;
+  llm.systemPrompt = prompt;
+  const el = document.getElementById('setting-system-prompt');
+  if (el) el.value = prompt;
+}
+
 async function _handleVrmSelect(val) {
+  // 切替前に現在のプロンプトを保存
+  const promptEl = document.getElementById('setting-system-prompt');
+  if (promptEl && _currentVrmId) {
+    _vrmSystemPrompts[_currentVrmId] = promptEl.value.trim();
+  }
+
   if (val === '__builtin__') {
     _currentVrmId = '__builtin__';
     _updateVrmEditRow();
+    _applyVrmSystemPrompt('__builtin__');
     await loadBuiltinVRM();
     storage.saveSettings(collectSettings()).catch(() => {});
     return;
   }
   _currentVrmId = val;
   _updateVrmEditRow();
+  _applyVrmSystemPrompt(val);
   vrmModelSelect.disabled = true;
   vrmLoadStatus.textContent = '読み込み中...';
   try {
@@ -212,9 +229,12 @@ vrmFileInput.addEventListener('change', async (e) => {
     o => o.value !== '__add__' && o.value !== '__builtin__' && _vrmFileNames[o.value] === file.name
   );
   if (found) {
+    // リリムのシステムプロンプトをコピー
+    _vrmSystemPrompts[found.value] = _vrmSystemPrompts['__builtin__'] ?? llm.systemPrompt;
     vrmModelSelect.value = found.value;
     _currentVrmId = found.value;
     _updateVrmEditRow();
+    _applyVrmSystemPrompt(found.value);
   }
   // デフォルトモーション
   try {
@@ -498,7 +518,7 @@ settingsBtn.addEventListener('click', () => {
     document.getElementById('setting-endpoint').value = llm.endpoint;
     document.getElementById('setting-api-key').value = llm.apiKey;
     document.getElementById('setting-model').value = llm.model;
-    document.getElementById('setting-system-prompt').value = llm.systemPrompt;
+    document.getElementById('setting-system-prompt').value = _vrmSystemPrompts[_currentVrmId] ?? llm.systemPrompt;
     document.getElementById('setting-tts-lang').value = llm.ttsLang;
     const speechSettings = speech.getSettings();
     document.getElementById('setting-aivis-url').value         = speechSettings.aivis_url              || 'http://localhost:10101';
@@ -523,6 +543,7 @@ saveSettingsBtn.addEventListener('click', () => {
   llm.apiKey       = document.getElementById('setting-api-key').value.trim();
   llm.model        = document.getElementById('setting-model').value.trim();
   llm.systemPrompt = document.getElementById('setting-system-prompt').value.trim();
+  _vrmSystemPrompts[_currentVrmId] = llm.systemPrompt;
   llm.ttsLang      = document.getElementById('setting-tts-lang').value;
 
   speech.updateAivisSettings(
@@ -580,6 +601,7 @@ function collectSettings() {
     ...speech.getSettings(),
     autosave_history: String(_autoSaveEnabled),
     vrm_char_names: JSON.stringify(_vrmCharNames),
+    vrm_system_prompts: JSON.stringify(_vrmSystemPrompts),
     selected_vrm_id: _currentVrmId,
   };
 }
@@ -591,6 +613,9 @@ function applySettings(s) {
   if (s.autosave_history !== undefined) _autoSaveEnabled = s.autosave_history === 'true';
   if (s.vrm_char_names) {
     try { _vrmCharNames = JSON.parse(s.vrm_char_names); } catch { _vrmCharNames = {}; }
+  }
+  if (s.vrm_system_prompts) {
+    try { _vrmSystemPrompts = JSON.parse(s.vrm_system_prompts); } catch { _vrmSystemPrompts = {}; }
   }
   if (s.selected_vrm_id) _currentVrmId = s.selected_vrm_id;
 }
@@ -721,6 +746,7 @@ async function initApp() {
 
   // 前回選択していたモデルを起動時にロード
   if (_currentVrmId === '__builtin__') {
+    llm.systemPrompt = _vrmSystemPrompts['__builtin__'] ?? llm.systemPrompt;
     await loadBuiltinVRM();
   } else {
     // ストレージから前回のモデルを読み込む
@@ -731,6 +757,7 @@ async function initApp() {
       const f = files.find(f => f.id === _currentVrmId);
       if (!f) throw new Error('保存されたモデルが見つかりません');
       _vrmFileNames[f.id] = f.name;
+      llm.systemPrompt = _vrmSystemPrompts[_currentVrmId] ?? llm.systemPrompt;
       const buf = await storage.downloadVRM(_currentVrmId);
       const file = new File([buf], f.name, { type: 'application/octet-stream' });
       await viewer.loadVRM(file, (pct) => setStatus(`読み込み中... ${pct}%`));
@@ -741,6 +768,7 @@ async function initApp() {
     } catch (err) {
       console.warn('前回のモデル読み込み失敗、ビルトインに戻します:', err.message);
       _currentVrmId = '__builtin__';
+      llm.systemPrompt = _vrmSystemPrompts['__builtin__'] ?? llm.systemPrompt;
       await loadBuiltinVRM();
     } finally {
       vrmModelSelect.disabled = false;
