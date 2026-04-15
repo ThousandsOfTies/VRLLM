@@ -12,7 +12,7 @@ import { AppStorage } from './app-storage.js';
 const canvas = document.getElementById('vrm-canvas');
 const viewer = new VRMViewer(canvas);
 const llm = new LLMClient();
-const speech = new SpeechManager();
+const speech = new SpeechManager(llm);
 const lipSync = new LipSync(viewer);
 const driveSync = new GoogleDriveSync();
 const local   = new LocalStorage();
@@ -443,11 +443,11 @@ if (!speech.sttSupported) {
 // 会話モード: TTS終了後に自動でマイクON (長押しでON/OFF)
 let autoListenMode = false;
 
-function startListeningOnce() {
+async function startListeningOnce() {
   speech.setLang(llm.ttsLang);
-  speech.startListening();
+  await speech.startListening();
   micBtn.classList.add('active');
-  setStatus('聞いています...');
+  setStatus(speech.isNoisy ? '✦ 高精度認識中...' : '🎤 聞いています...');
 
   speech.onTranscript = (text) => {
     micBtn.classList.remove('active');
@@ -465,20 +465,22 @@ function startListeningOnce() {
   };
 }
 
-function enterAutoListen() {
+async function enterAutoListen() {
   autoListenMode = true;
   micBtn.classList.add('auto-listen');
   micBtn.title = '会話モード中 (長押しで終了)';
   setStatus('会話モード ON');
   if (!speech.isListening && !chatInput.disabled) {
-    startListeningOnce();
+    await startListeningOnce();
   }
 }
 
 function exitAutoListen() {
   autoListenMode = false;
   micBtn.classList.remove('auto-listen');
-  micBtn.title = '音声入力 (クリックで開始/停止)';
+  micBtn.title = speech.isNoisy
+    ? 'Gemini 音声認識（騒音モード自動切替中）'
+    : '音声入力 (クリックで開始/停止)';
   if (speech.isListening) {
     speech.stopListening();
     micBtn.classList.remove('active');
@@ -526,7 +528,7 @@ micBtn.addEventListener('pointerup', () => {
     setStatus('');
     return;
   }
-  startListeningOnce();
+  startListeningOnce().catch(console.error);
 });
 
 micBtn.addEventListener('pointerleave', () => {
@@ -879,6 +881,20 @@ document.addEventListener('pointerdown', acquireWakeLock, { once: true });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') acquireWakeLock();
 });
+
+// ---- ノイズモニタリング起動（最初のタッチ時にマイク許可を取得） ----
+document.addEventListener('pointerdown', () => {
+  speech.startNoiseMonitoring();
+}, { once: true });
+
+// ノイズレベル変化時にマイクボタンのアイコン・スタイルを更新
+speech.onNoiseModeChange = (isNoisy) => {
+  micBtn.classList.toggle('noisy-mode', isNoisy);
+  micBtn.textContent = isNoisy ? '✦' : '🎤';
+  micBtn.title = isNoisy
+    ? 'Gemini 音声認識（騒音モード自動切替中）'
+    : '音声入力 (クリックで開始/停止)';
+};
 
 // ---- PWA: Service Worker 登録 ----
 if ('serviceWorker' in navigator) {

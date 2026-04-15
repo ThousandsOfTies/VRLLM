@@ -1,12 +1,19 @@
 /**
  * Web Speech API ラッパー
- * - STT (音声認識): SpeechRecognition
+ * - STT (音声認識): 環境音レベルに応じて Web Speech API / Gemini Audio を自動切替
  * - TTS: Aivis Cloud API (最優先) / ローカル AivisSpeech / ブラウザ SpeechSynthesis (フォールバック)
  */
 import { AivisSpeechClient, AivisCloudClient } from './aivis-speech.js';
 
 export class SpeechManager {
-  constructor() {
+  // ---- ノイズ判定定数 ----
+  static NOISE_THRESHOLD    = 0.015; // RMS閾値: これを超えると騒音モード
+  static NOISE_HYSTERESIS   = 0.008; // 静音復帰閾値（チャタリング防止）
+  static NOISE_HISTORY_SIZE = 6;     // ローリング平均サンプル数（500ms × 6 = 3秒）
+
+  constructor(llmClient = null) {
+    this._llm = llmClient; // Gemini STT 用（endpoint / apiKey / model 参照）
+
     this.isListening = false;
     this.isSpeaking = false;
 
@@ -32,11 +39,26 @@ export class SpeechManager {
 
     this._recognition = null;
     this._initRecognition();
+
+    // ---- ノイズモニタリング ----
+    this._noiseStream   = null;
+    this._noiseAudioCtx = null;
+    this._noiseAnalyser = null;
+    this._noiseHistory  = [];
+    this._noiseTimer    = null;
+    this.isNoisy        = false;
+    /** @type {function(boolean):void} */
+    this.onNoiseModeChange = null;
+
+    // ---- Gemini STT 録音 ----
+    this._mediaRecorder = null;
+    this._audioChunks   = [];
+    this._mimeType      = '';
   }
 
-
   get sttSupported() {
-    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+        || !!(navigator.mediaDevices && window.MediaRecorder);
   }
 
   /** AivisSpeech の疎通確認（非同期・バックグラウンド） */
@@ -99,6 +121,8 @@ export class SpeechManager {
     };
   }
 
+  // ---- Web Speech API 初期化 ----
+
   _initRecognition() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return;
@@ -132,12 +156,151 @@ export class SpeechManager {
     if (this._recognition) this._recognition.lang = lang;
   }
 
-  startListening() {
-    if (!this._recognition || this.isListening) return;
+  // ---- ノイズモニタリング ----
+
+  /** 環境音レベルの常時計測を開始する（最初のユーザー操作後に呼ぶ） */
+  async startNoiseMonitoring() {
+    if (this._noiseStream) return; // 既に起動済み
+    try {
+      this._noiseStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      });
+      this._noiseAudioCtx = new AudioContext();
+      this._noiseAnalyser = this._noiseAudioCtx.createAnalyser();
+      this._noiseAnalyser.fftSize = 2048;
+      this._noiseAudioCtx.createMediaStreamSource(this._noiseStream)
+        .connect(this._noiseAnalyser);
+      this._noiseHistory = [];
+      this._noiseTimer = setInterval(() => this._measureNoise(), 500);
+    } catch (e) {
+      console.warn('[NoiseMonitor] getUserMedia 失敗:', e.message);
+    }
+  }
+
+  /** ノイズモニタリングを停止してリソースを解放する */
+  stopNoiseMonitoring() {
+    clearInterval(this._noiseTimer);
+    this._noiseTimer = null;
+    this._noiseStream?.getTracks().forEach(t => t.stop());
+    this._noiseStream = null;
+    this._noiseAudioCtx?.close();
+    this._noiseAudioCtx = null;
+    this._noiseAnalyser = null;
+    this._noiseHistory  = [];
+  }
+
+  /** 500ms ごとに呼ばれてノイズレベルを計測・isNoisy を更新する */
+  _measureNoise() {
+    if (!this._noiseAnalyser) return;
+    const buf = new Uint8Array(this._noiseAnalyser.fftSize);
+    this._noiseAnalyser.getByteTimeDomainData(buf);
+    let sum = 0;
+    for (const v of buf) { const n = (v - 128) / 128; sum += n * n; }
+    const rms = Math.sqrt(sum / buf.length);
+
+    this._noiseHistory.push(rms);
+    if (this._noiseHistory.length > SpeechManager.NOISE_HISTORY_SIZE)
+      this._noiseHistory.shift();
+
+    const avg = this._noiseHistory.reduce((a, b) => a + b, 0) / this._noiseHistory.length;
+    // ヒステリシス: 騒音→静音は低い閾値を使ってチャタリングを防ぐ
+    const threshold = this.isNoisy
+      ? SpeechManager.NOISE_HYSTERESIS
+      : SpeechManager.NOISE_THRESHOLD;
+
+    const nowNoisy = avg > threshold;
+    if (nowNoisy !== this.isNoisy) {
+      this.isNoisy = nowNoisy;
+      this.onNoiseModeChange?.(this.isNoisy);
+    }
+  }
+
+  // ---- Gemini Audio STT ----
+
+  async _startGemini() {
+    if (this._mediaRecorder) return;
+    this._mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus') ? 'audio/ogg;codecs=opus' : 'audio/webm';
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true },
+      });
+    } catch (e) {
+      console.error('[Gemini STT] getUserMedia 失敗:', e.message);
+      this.isListening = false;
+      this.onListeningEnd?.();
+      return;
+    }
+    this._audioChunks = [];
+    this._mediaRecorder = new MediaRecorder(stream, { mimeType: this._mimeType });
+    this._mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) this._audioChunks.push(e.data); };
+    this._mediaRecorder.onstop = () => { stream.getTracks().forEach(t => t.stop()); this._transcribeGemini(); };
+    this._mediaRecorder.start();
+    this.isListening = true;
+    clearTimeout(this._recognitionTimer);
+    this._recognitionTimer = setTimeout(() => {
+      if (this.isListening) {
+        console.warn('[Gemini STT] タイムアウトにより強制停止');
+        this.stopListening();
+      }
+    }, 15000);
+  }
+
+  _stopGemini() {
+    clearTimeout(this._recognitionTimer);
+    if (!this._mediaRecorder) return;
+    this._mediaRecorder.stop();
+    this._mediaRecorder = null;
+    this.isListening = false;
+  }
+
+  async _transcribeGemini() {
+    const ext  = this._mimeType.includes('ogg') ? 'ogg' : 'webm';
+    const blob = new Blob(this._audioChunks, { type: this._mimeType });
+    this._audioChunks = [];
+    // base64 変換
+    const arrayBuffer = await blob.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    const model  = this._llm?.model  || 'gemini-2.0-flash';
+    const apiKey = this._llm?.apiKey || '';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const body = {
+      contents: [{ parts: [
+        { inline_data: { mime_type: this._mimeType.split(';')[0], data: base64 } },
+        { text: '以下の音声を正確に書き起こしてください。書き起こしたテキストのみを出力してください。' },
+      ]}],
+    };
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`Gemini STT ${res.status}`);
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (text) this.onTranscript?.(text);
+      else this.onListeningEnd?.();
+    } catch (e) {
+      console.error('[Gemini STT] 転写エラー:', e.message);
+      this.onListeningEnd?.();
+    }
+  }
+
+  // ---- STT 制御（環境音で自動切替） ----
+
+  async startListening() {
+    if (this.isListening) return;
+    if (this.isNoisy) {
+      await this._startGemini();
+      return;
+    }
+    // Web Speech API パス
+    if (!this._recognition) return;
     this._recognition.start();
     this.isListening = true;
-
-    // セーフティネット: 一定時間(15秒)経っても終了しない場合は強制停止
     clearTimeout(this._recognitionTimer);
     this._recognitionTimer = setTimeout(() => {
       if (this.isListening) {
@@ -148,7 +311,9 @@ export class SpeechManager {
   }
 
   stopListening() {
-    if (!this._recognition || !this.isListening) return;
+    if (!this.isListening) return;
+    if (this._mediaRecorder) { this._stopGemini(); return; }
+    // Web Speech API パス
     clearTimeout(this._recognitionTimer);
     this._recognition.stop();
     this.isListening = false;

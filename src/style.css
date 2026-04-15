@@ -232,6 +232,17 @@ body {
 }
 #mic-btn:hover:not(:disabled) { background: #22223a; }
 #mic-btn:disabled { opacity: 0.4; cursor: default; }
+/* 騒音モード（Gemini自動切替中）: Googleブルー枠 */
+#mic-btn.noisy-mode {
+  border-color: #8ab4f8;
+  color: #8ab4f8;
+}
+#mic-btn.noisy-mode.active {
+  background: #c0392b;
+  border-color: #e74c3c;
+  color: #fff;
+}
+
 #mic-btn.active {
   background: #c0392b;
   border-color: #e74c3c;
