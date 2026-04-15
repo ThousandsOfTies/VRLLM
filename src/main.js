@@ -647,7 +647,7 @@ let _locationEnabled = false;
  * Nominatim (OpenStreetMap) で逆ジオコーディングして位置情報文字列を返す。
  * 取得できなかった場合は null を返す。
  */
-async function fetchLocationContext() {
+function fetchLocationContext() {
   if (!navigator.geolocation) return null;
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
@@ -720,8 +720,7 @@ function scheduleHistorySave() {
   _autoSaveTimer = setTimeout(async () => {
     try {
       await storage.saveHistory(llm.history);
-      setStatus('履歴を自動保存しました');
-      setTimeout(() => { if (statusEl.textContent === '履歴を自動保存しました') setStatus(''); }, 3000);
+      setStatusTemp(statusEl, '履歴を自動保存しました');
     } catch (err) {
       console.warn('履歴自動保存失敗:', err.message);
     }
@@ -837,8 +836,7 @@ driveSync.onSignInChange = (isSignedIn) => {
         }
       }
 
-      driveStatus.textContent = '✅ Drive から設定を読み込みました';
-      setTimeout(() => { if (driveStatus.textContent.includes('読み込みました')) driveStatus.textContent = ''; }, 3000);
+      setStatusTemp(driveStatus, '✅ Drive から設定を読み込みました');
     }).catch(err => {
       driveStatus.textContent = `❌ 設定の読み込みに失敗しました: ${err.message}`;
     });
@@ -922,10 +920,11 @@ async function initApp() {
 
   if (driveSync.isSignedIn) {
     driveAutosaveChk.checked = _autoSaveEnabled;
-    driveStatus.textContent = saved
-      ? '✅ Drive から設定を読み込みました'
-      : '⚠️ Drive に設定がまだ保存されていません';
-    if (saved) setTimeout(() => { if (driveStatus.textContent.includes('読み込みました')) driveStatus.textContent = ''; }, 3000);
+    if (saved) {
+      setStatusTemp(driveStatus, '✅ Drive から設定を読み込みました');
+    } else {
+      driveStatus.textContent = '⚠️ Drive に設定がまだ保存されていません';
+    }
   }
 
   // 前回選択していたモデルを起動時にロード
@@ -1093,6 +1092,11 @@ function scrollToBottom(force = false) {
 
 function setStatus(text) {
   statusEl.textContent = text;
+}
+
+function setStatusTemp(el, text, ms = 3000) {
+  el.textContent = text;
+  setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, ms);
 }
 
 function setInputEnabled(enabled) {

@@ -32,11 +32,17 @@ export class GoogleDriveSync {
           console.error('OAuth error:', resp.error);
           return;
         }
+        const wasSignedIn = !!this._token;
         this._token = resp.access_token;
         this._tokenExpiry = Date.now() + TOKEN_LIFETIME_SEC * 1000;
         this._scheduleTokenRefresh();
-        await this._fetchAndSaveEmail();
-        this.onSignInChange?.(true);
+        if (wasSignedIn) {
+          // トークンリフレッシュ: プロフィールは既に取得済みなのでセッションのみ更新
+          this._saveSession();
+        } else {
+          await this._fetchAndSaveEmail();
+          this.onSignInChange?.(true);
+        }
       },
     });
 
