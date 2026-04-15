@@ -975,6 +975,10 @@ async function acquireWakeLock() {
   if (_wakeLock?.released === false) return; // 既に有効
   try {
     _wakeLock = await navigator.wakeLock.request('screen');
+    // ブラウザが自動解除したときにページが表示中なら即再取得
+    _wakeLock.addEventListener('release', () => {
+      if (document.visibilityState === 'visible') acquireWakeLock();
+    }, { once: true });
   } catch (err) {
     console.warn('Wake Lock 取得失敗:', err.message);
   }
