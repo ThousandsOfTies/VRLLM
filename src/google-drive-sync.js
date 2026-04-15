@@ -134,6 +134,7 @@ export class GoogleDriveSync {
     this._token       = null;
     this._tokenExpiry = 0;
     this._email       = null;
+    this._name        = null;
     this._picture     = null;
     this._clearSession();
     this.onSignInChange?.(false);

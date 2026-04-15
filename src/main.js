@@ -52,11 +52,16 @@ async function loadDefaultVRMA(isIdle = false) {
   vrmaPresetSelect.value = DEFAULT_VRMA;
 }
 
-/** 現在の設定をストレージに非同期保存（失敗はコンソール警告のみ） */
+/** 現在の設定をストレージに非同期保存（失敗はコンソール警告のみ）。
+ *  短時間に複数回呼ばれた場合はデバウンスして1回にまとめる。 */
+let _saveSettingsTimer = null;
 function saveSettings() {
-  storage.saveSettings(collectSettings()).catch(err =>
-    console.warn('設定保存失敗:', err.message)
-  );
+  clearTimeout(_saveSettingsTimer);
+  _saveSettingsTimer = setTimeout(() => {
+    storage.saveSettings(collectSettings()).catch(err =>
+      console.warn('設定保存失敗:', err.message)
+    );
+  }, 500);
 }
 
 /** VRMキャンバスのスナップショットをAIアバターとして保存 */
@@ -772,8 +777,10 @@ driveSync.onSignInChange = (isSignedIn) => {
       // Drive から設定を読んだ結果 VRM が変わっていれば読み込む
       if (_currentVrmId !== prevVrmId && _currentVrmId !== '__builtin__') {
         try {
-          const buf = await storage.downloadVRM(_currentVrmId);
+          // _vrmFileNames を最新化してからダウンロード（ファイル名が空だと壊れるため）
+          await refreshVRMList(_currentVrmId);
           const fname = _vrmFileNames[_currentVrmId] || _currentVrmId;
+          const buf = await storage.downloadVRM(_currentVrmId);
           const file = new File([buf], fname, { type: 'application/octet-stream' });
           await viewer.loadVRM(file, (pct) => setStatus(`読み込み中... ${pct}%`));
           await loadDefaultVRMA(true);
@@ -820,12 +827,31 @@ async function initApp() {
   // IndexedDB を開く
   await local.init();
 
-  // Google Drive セッション復元（完了後に onSignInChange が発火する場合がある）
+  // Drive 初期化中に onSignInChange が発火しても UI のみ更新し、
+  // 設定読み込みは initApp 側で一元管理する（二重読み込みの競合を防ぐ）
+  const _postInitCallback = driveSync.onSignInChange;
+  driveSync.onSignInChange = (isSignedIn) => {
+    updateDriveSyncUI(isSignedIn);
+    if (isSignedIn) updateUserAvatars();
+  };
+
+  // Google Drive セッション復元
   await driveSync.init().catch(err => console.warn('Drive sync init:', err));
+
+  // 実際のコールバックを復元（以降のサインイン/サインアウト操作に対応）
+  driveSync.onSignInChange = _postInitCallback;
 
   // サインイン状態に応じたバックエンドから設定を読み込む（selected_vrm_id も復元される）
   const saved = await storage.loadSettings().catch(() => null);
   applySettings(saved);
+
+  if (driveSync.isSignedIn) {
+    driveAutosaveChk.checked = _autoSaveEnabled;
+    driveStatus.textContent = saved
+      ? '✅ Drive から設定を読み込みました'
+      : '⚠️ Drive に設定がまだ保存されていません';
+    if (saved) setTimeout(() => { if (driveStatus.textContent.includes('読み込みました')) driveStatus.textContent = ''; }, 3000);
+  }
 
   // 前回選択していたモデルを起動時にロード
   if (_currentVrmId === '__builtin__') {
