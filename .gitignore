@@ -1,6 +1,7 @@
 node_modules/
 dist/
 vscode-extension/dist/
+*.vsix
 .DS_Store
 *.local
 .env
