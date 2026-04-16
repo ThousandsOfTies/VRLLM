@@ -1,0 +1,50 @@
+{
+  "name": "vrllm-mascot",
+  "displayName": "VRLLM Mascot",
+  "description": "VRM 3D mascot that chats with you while you code",
+  "version": "0.1.0",
+  "publisher": "thousandsofties",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "vrllm.sendEditorContext",
+        "title": "VRLLM: Send Current File to Mascot"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vrllm-sidebar",
+          "title": "VRLLM Mascot",
+          "icon": "icons/icon.png"
+        }
+      ]
+    },
+    "views": {
+      "vrllm-sidebar": [
+        {
+          "type": "webview",
+          "id": "vrllm.mascotView",
+          "name": "Mascot"
+        }
+      ]
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "vrllm.sendEditorContext",
+          "group": "vrllm"
+        }
+      ]
+    }
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.0.0"
+  }
+}

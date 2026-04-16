@@ -1,0 +1,12 @@
+# ソースファイル（dist/ にビルド済みのものが入る）
+src/**
+public/**
+
+# ビルドツール
+node_modules/**
+*.config.js
+
+# その他
+package-lock.json
+.env*
+.gitignore

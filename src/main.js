@@ -8,6 +8,19 @@ import { GoogleDriveSync } from './google-drive-sync.js';
 import { LocalStorage } from './local-storage.js';
 import { AppStorage } from './app-storage.js';
 
+// ---- VSCode WebView 環境の検出 ----
+// acquireVsCodeApi はブラウザでは存在しない。?. で安全に呼び出す。
+const _vscode = typeof acquireVsCodeApi !== 'undefined' ? acquireVsCodeApi() : null;
+let _editorContext = '';
+window.addEventListener('message', (event) => {
+  const msg = event.data;
+  if (!msg || msg.type !== 'editorContext') return;
+  const parts = [];
+  if (msg.fileName) parts.push(`現在編集中のファイル: ${msg.fileName} (${msg.languageId})`);
+  if (msg.selection) parts.push(`選択中のコード:\n\`\`\`${msg.languageId}\n${msg.selection}\n\`\`\``);
+  _editorContext = parts.join('\n');
+});
+
 // ---- インスタンス生成 ----
 const canvas = document.getElementById('vrm-canvas');
 const viewer = new VRMViewer(canvas);
@@ -326,6 +339,10 @@ let _activePipeline = null;
 async function sendMessage(text) {
   text = text.trim();
   if (!text) return;
+  // VSCode モード: エディターコンテキストをメッセージに追記
+  if (_vscode && _editorContext) {
+    text = `${text}\n\n[Editor context]\n${_editorContext}`;
+  }
 
   // iOS Safari などの自動再生ブロック（無音になり、onended が発火せず口がバグる問題）を回避するため、
   // ユーザーがボタンを押した直後のタイミングで AudioContext を解禁（resume）しておく
@@ -900,6 +917,12 @@ locationChk.addEventListener('change', async () => {
 // ---- アプリ初期化 ----
 
 async function initApp() {
+  // VSCode WebView では Google Drive サインインが使えないため非表示にする
+  if (_vscode) {
+    document.getElementById('drive-signin-btn').style.display = 'none';
+    document.getElementById('drive-ui-in').style.display = 'none';
+  }
+
   // IndexedDB を開く
   await local.init();
 
@@ -962,6 +985,9 @@ async function initApp() {
       vrmModelSelect.disabled = false;
     }
   }
+
+  // VSCode WebView に初期化完了を通知（エディターコンテキストの初回送信を促す）
+  _vscode?.postMessage({ type: 'ready' });
 }
 
 initApp().catch(err => console.warn('App init error:', err));
@@ -983,13 +1009,15 @@ async function acquireWakeLock() {
     console.warn('Wake Lock 取得失敗:', err.message);
   }
 }
-acquireWakeLock();
-// 最初のユーザー操作時に再試行（モバイル対応）
-document.addEventListener('pointerdown', acquireWakeLock, { once: true });
-// タブが再び表示されたとき（ロック解除後など）に再取得
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') acquireWakeLock();
-});
+if (!import.meta.env.VSCODE_BUILD) {
+  acquireWakeLock();
+  // 最初のユーザー操作時に再試行（モバイル対応）
+  document.addEventListener('pointerdown', acquireWakeLock, { once: true });
+  // タブが再び表示されたとき（ロック解除後など）に再取得
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') acquireWakeLock();
+  });
+}
 
 // ノイズレベル変化時にマイクボタンのアイコン・スタイルを更新
 speech.onNoiseModeChange = (isNoisy) => {
@@ -1001,7 +1029,7 @@ speech.onNoiseModeChange = (isNoisy) => {
 };
 
 // ---- PWA: Service Worker 登録 ----
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && !import.meta.env.VSCODE_BUILD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`)
       .catch(err => console.warn('SW 登録失敗:', err));
