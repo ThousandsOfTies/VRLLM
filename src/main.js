@@ -792,10 +792,17 @@ function collectSettings() {
 }
 
 function applySettings(s) {
-  if (!s) return;
+  if (!s) {
+    _autoSaveEnabled = true; // デフォルトで自動保存ON
+    return;
+  }
   llm.applySettings(s);
   speech.applySettings(s);
-  if (s.autosave_history !== undefined) _autoSaveEnabled = s.autosave_history === 'true';
+  if (s.autosave_history !== undefined) {
+    _autoSaveEnabled = s.autosave_history === 'true';
+  } else {
+    _autoSaveEnabled = true;
+  }
   if (s.location_enabled  !== undefined) _locationEnabled  = s.location_enabled  === 'true';
   if (s.vrm_char_names) {
     try { _vrmCharNames = JSON.parse(s.vrm_char_names); } catch { _vrmCharNames = {}; }
@@ -819,17 +826,31 @@ function applySettings(s) {
 }
 
 function scheduleHistorySave() {
-  if (!_autoSaveEnabled) return;
+  if (!_autoSaveEnabled) {
+    console.log('[HistorySync] 保存: 自動保存がOFFのためスキップ');
+    return;
+  }
   clearTimeout(_autoSaveTimer);
   _autoSaveTimer = setTimeout(async () => {
     try {
+      console.log(`[HistorySync] 保存実行中... (現在の履歴件数: ${llm.history.length})`);
       await storage.saveHistory(llm.history);
+      console.log('[HistorySync] 履歴の保存が正常に完了しました!');
       setStatusTemp(statusEl, '履歴を自動保存しました');
     } catch (err) {
-      console.warn('履歴自動保存失敗:', err.message);
+      console.error('[HistorySync] 履歴の自動保存エラー:', err.message);
     }
-  }, 15_000); // 最後の返答から15秒後に保存
+  }, 2000); // 最後の返答から2秒後に保存（離脱時の保存漏れを防ぐため短縮）
 }
+
+// 画面を閉じる際・リロードする際にも即座に保存を試みる
+window.addEventListener('beforeunload', () => {
+  console.log('[HistorySync] 画面遷移(beforeunload)を検知しました');
+  if (_autoSaveEnabled && llm.history.length > 0) {
+    console.log(`[HistorySync] 退避のための即時保存を実行します (件数: ${llm.history.length})`);
+    storage.saveHistory(llm.history);
+  }
+});
 
 const driveAutosaveChk = document.getElementById('drive-autosave-chk');
 const driveSigninBtn   = document.getElementById('drive-signin-btn');
@@ -929,19 +950,24 @@ driveSync.onSignInChange = (isSignedIn) => {
       // プロファイル（長期記憶）と会話履歴の非同期ロード（入力ブロックせずバックグラウンドで実行）
       (async () => {
         try {
+          console.log('[HistorySync] Drive同期後: プロファイル読み込み処理を開始します...');
           const profileInfo = await driveSync.loadUserProfile();
           if (profileInfo && Array.isArray(profileInfo)) {
             llm.userProfile = profileInfo;
-            console.log("✅ Google Driveから長期記憶（プロファイル）を読み込みました:", profileInfo);
+            console.log("[HistorySync] Drive同期後: プロファイルを復元しました:", profileInfo);
+          } else {
+            console.log('[HistorySync] Drive同期後: 既存のプロファイルは見つかりませんでした（または空です）');
           }
         } catch (err) {
-          console.warn('プロファイル読み込み失敗:', err.message);
+          console.error('[HistorySync] Drive同期後: プロファイル読み込み失敗:', err.message);
         }
 
         if (_autoSaveEnabled) {
           try {
+            console.log('[HistorySync] Drive同期後: 会話履歴の読み込み処理を開始します...');
             const hist = await storage.loadHistory();
             if (hist && Array.isArray(hist.messages)) {
+              console.log(`[HistorySync] Drive同期後: 会話履歴を受信しました (API取得件数: ${hist.messages.length}件)`);
               const pastMsgs = hist.messages.filter(m => m.role === 'user' || m.role === 'assistant');
               if (pastMsgs.length > 0) {
                 // ダウンロード完了時に、すでにユーザーが送信したメッセージの「前」に過去履歴をマージする
@@ -950,12 +976,18 @@ driveSync.onSignInChange = (isSignedIn) => {
                 for (const msg of llm.history) {
                   appendMessage(msg.role, msg.content, true);
                 }
-                console.log("✅ Google Driveから会話履歴を非同期マージ完了:", pastMsgs.length, "件");
+                console.log(`[HistorySync] Drive同期後: 会話履歴をUIへマージ・反映完了 (最終件数: ${llm.history.length}件)`);
+              } else {
+                console.log('[HistorySync] Drive同期後: 受信した履歴データに有効な発言が含まれていませんでした');
               }
+            } else {
+              console.log('[HistorySync] Drive同期後: クラウド上に保存された履歴データが存在しませんでした');
             }
           } catch (err) {
-            console.warn('会話履歴読み込み失敗:', err.message);
+            console.error('[HistorySync] Drive同期後: 会話履歴読み込み失敗:', err.message);
           }
+        } else {
+          console.log('[HistorySync] Drive同期後: 自動保存設定がOFFのため、履歴の復元をスキップします');
         }
       })();
 
@@ -1072,18 +1104,26 @@ async function initApp() {
   // プロファイルと会話履歴の非同期ロード（起動時）
   (async () => {
     try {
+      console.log('[HistorySync] 起動時: プロファイル読み込み処理を開始します...');
       const profileInfo = typeof storage._b.loadUserProfile === 'function'
         ? await storage._b.loadUserProfile()
         : await driveSync.loadUserProfile().catch(()=>null);
       if (profileInfo && Array.isArray(profileInfo)) {
         llm.userProfile = profileInfo;
+        console.log('[HistorySync] 起動時: プロファイルを復元しました', profileInfo);
+      } else {
+        console.log('[HistorySync] 起動時: 保存されたプロファイルは見つかりませんでした');
       }
-    } catch(e) {}
+    } catch(e) {
+      console.error('[HistorySync] 起動時: プロファイル読み込みエラー', e);
+    }
 
     if (_autoSaveEnabled) {
       try {
+        console.log('[HistorySync] 起動時: 会話履歴の読み込み処理を開始します...');
         const hist = await storage.loadHistory();
         if (hist && Array.isArray(hist.messages)) {
+          console.log(`[HistorySync] 起動時: 会話履歴を受信しました (API取得件数: ${hist.messages.length}件)`);
           const pastMsgs = hist.messages.filter(m => m.role === 'user' || m.role === 'assistant');
           if (pastMsgs.length > 0) {
             llm.history = [...pastMsgs, ...llm.history];
@@ -1091,9 +1131,18 @@ async function initApp() {
             for (const msg of llm.history) {
               appendMessage(msg.role, msg.content, true);
             }
+            console.log(`[HistorySync] 起動時: 会話履歴をUIへマージ・反映完了 (最終件数: ${llm.history.length}件)`);
+          } else {
+            console.log('[HistorySync] 起動時: 受信したデータに有効な発言が含まれていませんでした');
           }
+        } else {
+          console.log('[HistorySync] 起動時: クラウドまたはローカルに保存された履歴データが存在しませんでした');
         }
-      } catch(e) {}
+      } catch(e) {
+        console.error('[HistorySync] 起動時: 会話履歴読み込みエラー', e);
+      }
+    } else {
+      console.log('[HistorySync] 起動時: 自動保存設定がOFFのため、履歴の復元をスキップします');
     }
   })();
 
