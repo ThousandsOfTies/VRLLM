@@ -926,16 +926,38 @@ driveSync.onSignInChange = (isSignedIn) => {
           _locationEnabled && llm.locationContext ? `✅ ${llm.locationContext}` : '';
       }
 
-      // プロファイル（長期記憶）のロード
-      try {
-        const profileInfo = await driveSync.loadUserProfile();
-        if (profileInfo && Array.isArray(profileInfo)) {
-          llm.userProfile = profileInfo;
-          console.log("✅ Google Driveから長期記憶（プロファイル）を読み込みました:", profileInfo);
+      // プロファイル（長期記憶）と会話履歴の非同期ロード（入力ブロックせずバックグラウンドで実行）
+      (async () => {
+        try {
+          const profileInfo = await driveSync.loadUserProfile();
+          if (profileInfo && Array.isArray(profileInfo)) {
+            llm.userProfile = profileInfo;
+            console.log("✅ Google Driveから長期記憶（プロファイル）を読み込みました:", profileInfo);
+          }
+        } catch (err) {
+          console.warn('プロファイル読み込み失敗:', err.message);
         }
-      } catch (err) {
-        console.warn('プロファイル読み込み失敗:', err.message);
-      }
+
+        if (_autoSaveEnabled) {
+          try {
+            const hist = await storage.loadHistory();
+            if (hist && Array.isArray(hist.messages)) {
+              const pastMsgs = hist.messages.filter(m => m.role === 'user' || m.role === 'assistant');
+              if (pastMsgs.length > 0) {
+                // ダウンロード完了時に、すでにユーザーが送信したメッセージの「前」に過去履歴をマージする
+                llm.history = [...pastMsgs, ...llm.history];
+                chatMessages.innerHTML = '';
+                for (const msg of llm.history) {
+                  appendMessage(msg.role, msg.content, true);
+                }
+                console.log("✅ Google Driveから会話履歴を非同期マージ完了:", pastMsgs.length, "件");
+              }
+            }
+          } catch (err) {
+            console.warn('会話履歴読み込み失敗:', err.message);
+          }
+        }
+      })();
 
       // Drive から設定を読んだ結果 VRM が変わっていれば読み込む
       if (_currentVrmId !== prevVrmId && _currentVrmId !== '__builtin__') {
@@ -1046,6 +1068,35 @@ async function initApp() {
   // サインイン状態に応じたバックエンドから設定を読み込む（selected_vrm_id も復元される）
   const saved = await storage.loadSettings().catch(() => null);
   applySettings(saved);
+
+  // プロファイルと会話履歴の非同期ロード（起動時）
+  (async () => {
+    try {
+      const profileInfo = typeof storage._b.loadUserProfile === 'function'
+        ? await storage._b.loadUserProfile()
+        : await driveSync.loadUserProfile().catch(()=>null);
+      if (profileInfo && Array.isArray(profileInfo)) {
+        llm.userProfile = profileInfo;
+      }
+    } catch(e) {}
+
+    if (_autoSaveEnabled) {
+      try {
+        const hist = await storage.loadHistory();
+        if (hist && Array.isArray(hist.messages)) {
+          const pastMsgs = hist.messages.filter(m => m.role === 'user' || m.role === 'assistant');
+          if (pastMsgs.length > 0) {
+            llm.history = [...pastMsgs, ...llm.history];
+            chatMessages.innerHTML = '';
+            for (const msg of llm.history) {
+              appendMessage(msg.role, msg.content, true);
+            }
+          }
+        }
+      } catch(e) {}
+    }
+  })();
+
   _applyLocationIfEnabled();
   locationChk.checked = _locationEnabled;
 
