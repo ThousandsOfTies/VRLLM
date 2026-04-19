@@ -1286,28 +1286,36 @@ function showReauthToast(email) {
 
 // ---- スクリーンロック防止 (Wake Lock API) ----
 // モバイルブラウザはユーザー操作後でないと取得できないため、
-// ページロード時と最初のユーザー操作時の両方で取得を試みる
+// 複数のイベントで繰り返し再取得を試みる
 let _wakeLock = null;
 async function acquireWakeLock() {
   if (!('wakeLock' in navigator)) return;
-  if (_wakeLock?.released === false) return; // 既に有効
+  // 既に有効なロックがあればスキップ
+  if (_wakeLock && !_wakeLock.released) return;
   try {
     _wakeLock = await navigator.wakeLock.request('screen');
-    // ブラウザが自動解除したときにページが表示中なら即再取得
+    console.log('[WakeLock] スクリーンロック防止を取得しました');
+    // ブラウザやOSが自動解除した場合、ページが表示中なら即再取得
+    // ※ once を付けない: 再取得→再解放のサイクルに何度でも対応する
     _wakeLock.addEventListener('release', () => {
+      console.log('[WakeLock] 解放されました。再取得を試みます...');
+      _wakeLock = null;
       if (document.visibilityState === 'visible') acquireWakeLock();
-    }, { once: true });
+    });
   } catch (err) {
-    console.warn('Wake Lock 取得失敗:', err.message);
+    console.warn('[WakeLock] 取得失敗:', err.message);
   }
 }
 acquireWakeLock();
-// 最初のユーザー操作時に再試行（モバイル対応）
-document.addEventListener('pointerdown', acquireWakeLock, { once: true });
-// タブが再び表示されたとき（ロック解除後など）に再取得
+// ユーザー操作時に毎回再取得を試みる（iOS Safari はユーザージェスチャーが必要なため）
+document.addEventListener('pointerdown', acquireWakeLock);
+// タブが再び表示されたとき
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') acquireWakeLock();
 });
+// iOS Safari: 画面ロック解除後は focus / pageshow の方が確実に発火する
+window.addEventListener('focus', acquireWakeLock);
+window.addEventListener('pageshow', acquireWakeLock);
 
 // ノイズレベル変化時にマイクボタンのアイコン・スタイルを更新
 speech.onNoiseModeChange = (isNoisy) => {
