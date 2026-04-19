@@ -528,18 +528,10 @@ body {
   overflow-y: auto;
 }
 
-/* キャラタブ：テキストエリアを残り領域に広げる */
-#tab-chara.active {
-  overflow: hidden;
-}
-#tab-chara > label:last-child {
-  flex: 1;
-  min-height: 0;
-}
+/* キャラタブ：テキストエリアを程よい高さにする */
 #setting-system-prompt {
-  flex: 1;
-  resize: none;
-  min-height: 100px;
+  resize: vertical;
+  min-height: 120px;
 }
 
 /* ---- VRM 編集行 ---- */
