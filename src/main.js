@@ -811,6 +811,47 @@ function collectSettings() {
   };
 }
 
+/** 全ての設定とメモリ、UIを初期状態にリセットする */
+function resetToDefaults() {
+  console.log('[Sync] 全ての状態をデフォルトにリセットします...');
+  
+  // フラグ類
+  _autoSaveEnabled = true;
+  _locationEnabled = false;
+  
+  // キャラクター関連メモリ
+  _currentVrmId = '__builtin__';
+  _vrmCharNames = {};
+  _vrmSystemPrompts = {};
+  
+  // LLM / 音声エンジン設定のリセット（インスタンス内部のデフォルトへ）
+  llm.applySettings({});
+  speech.applySettings({});
+  
+  // 会話履歴と長期記憶
+  llm.clearHistory();
+  llm.userProfile = [];
+  
+  // UIのクリア
+  chatMessages.innerHTML = '';
+  document.getElementById('setting-system-prompt').value = '';
+  document.getElementById('setting-user-profile').value = '';
+  
+  // 設定パネルが開いていれば反映（念のため）
+  if (!settingsPanel.classList.contains('hidden')) {
+    document.getElementById('setting-endpoint').value = llm.endpoint;
+    document.getElementById('setting-api-key').value = llm.apiKey;
+    document.getElementById('setting-model').value = llm.model;
+    document.getElementById('setting-tts-lang').value = llm.ttsLang;
+    const ss = speech.getSettings();
+    document.getElementById('setting-aivis-url').value = ss.aivis_url || '';
+    document.getElementById('setting-aivis-speaker').value = ss.aivis_speaker_id || '';
+  }
+
+  // ビルトインモデルに戻す（非同期だが待機はしない）
+  loadBuiltinVRM().catch(e => console.warn('Reset VRM failed:', e));
+}
+
 function applySettings(s) {
   if (!s) {
     _autoSaveEnabled = true; // デフォルトで自動保存ON
@@ -948,11 +989,17 @@ function updateDriveSyncUI(isSignedIn) {
   }
 }
 
-driveSync.onSignInChange = (isSignedIn) => {
+driveSync.onSignInChange = (isSignedIn, isNewLogin = false) => {
   updateDriveSyncUI(isSignedIn);
   if (isSignedIn) {
     updateUserAvatars();
-    driveStatus.textContent = '読み込み中...';
+    
+    // 新規ログイン（アカウント切り替え）時は一旦ローカルを空にする
+    if (isNewLogin) {
+      resetToDefaults();
+    }
+
+    driveStatus.textContent = '同期中...';
     storage.loadSettings().then(async s => {
       if (!s) {
         driveStatus.textContent = '⚠️ Drive に設定がまだ保存されていません';
@@ -1003,13 +1050,17 @@ driveSync.onSignInChange = (isSignedIn) => {
               console.log(`[HistorySync] Drive同期後: 会話履歴を受信しました (API取得件数: ${hist.messages.length}件)`);
               const pastMsgs = hist.messages.filter(m => m.role === 'user' || m.role === 'assistant');
               if (pastMsgs.length > 0) {
-                // ダウンロード完了時に、すでにユーザーが送信したメッセージの「前」に過去履歴をマージする
-                llm.history = [...pastMsgs, ...llm.history];
+                // 新規ログイン時は完全に上書き、そうでない場合は既存の末尾（現在進行中の会話）の前に挿入
+                if (isNewLogin) {
+                  llm.history = pastMsgs;
+                } else {
+                  llm.history = [...pastMsgs, ...llm.history];
+                }
                 chatMessages.innerHTML = '';
                 for (const msg of llm.history) {
                   appendMessage(msg.role, msg.content, true);
                 }
-                console.log(`[HistorySync] Drive同期後: 会話履歴をUIへマージ・反映完了 (最終件数: ${llm.history.length}件)`);
+                console.log(`[HistorySync] Drive同期後: 会話履歴を反映完了 (最終件数: ${llm.history.length}件)`);
               } else {
                 console.log('[HistorySync] Drive同期後: 受信した履歴データに有効な発言が含まれていませんでした');
               }

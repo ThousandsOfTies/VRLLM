@@ -36,12 +36,15 @@ export class GoogleDriveSync {
         this._token = resp.access_token;
         this._tokenExpiry = Date.now() + TOKEN_LIFETIME_SEC * 1000;
         this._scheduleTokenRefresh();
+        
         if (wasSignedIn) {
-          // トークンリフレッシュ: プロフィールは既に取得済みなのでセッションのみ更新
+          // トークンリフレッシュ: セッションのみ更新
           this._saveSession();
         } else {
+          // 新規サインイン（またはアカウント切り替え初期化）
           await this._fetchAndSaveEmail();
-          this.onSignInChange?.(true);
+          // 第2引数 isNewLogin を true にして通知
+          this.onSignInChange?.(true, true);
         }
       },
     });
