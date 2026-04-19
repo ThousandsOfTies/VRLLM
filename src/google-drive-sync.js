@@ -392,6 +392,7 @@ export class GoogleDriveSync {
     if (!onProgress) {
       return fetch(url, {
         method: 'PUT',
+        keepalive: true,
         headers: { 'Content-Type': 'application/octet-stream' },
         body: blob,
       }).then(res => {
@@ -424,7 +425,8 @@ export class GoogleDriveSync {
   // Authorization ヘッダーを付与、401 で自動サインアウト
   async _fetch(url, options = {}) {
     const headers = { ...options.headers, Authorization: `Bearer ${this._token}` };
-    const res = await fetch(url, { ...options, headers });
+    // iOS Safariでバックグラウンド移行時(visibilitychange等)にリクエストがキャンセルされるのを防ぐため keepalive: true
+    const res = await fetch(url, { keepalive: true, ...options, headers });
     if (res.status === 401) {
       this._token = null;
       this._tokenExpiry = 0;

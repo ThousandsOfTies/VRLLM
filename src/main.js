@@ -843,12 +843,25 @@ function scheduleHistorySave() {
   }, 2000); // 最後の返答から2秒後に保存（離脱時の保存漏れを防ぐため短縮）
 }
 
-// 画面を閉じる際・リロードする際にも即座に保存を試みる
-window.addEventListener('beforeunload', () => {
-  console.log('[HistorySync] 画面遷移(beforeunload)を検知しました');
+// 画面を閉じる際・裏に回る際（iOS Safari対策）にも即座に保存を試みる
+function _forceSaveOnExit() {
   if (_autoSaveEnabled && llm.history.length > 0) {
     console.log(`[HistorySync] 退避のための即時保存を実行します (件数: ${llm.history.length})`);
     storage.saveHistory(llm.history);
+  }
+}
+window.addEventListener('beforeunload', (e) => {
+  console.log('[HistorySync] 画面遷移(beforeunload)を検知しました');
+  _forceSaveOnExit();
+});
+window.addEventListener('pagehide', (e) => {
+  console.log('[HistorySync] 画面非表示(pagehide)を検知しました');
+  _forceSaveOnExit();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    console.log('[HistorySync] バックグラウンド移行(visibilitychange)を検知しました');
+    _forceSaveOnExit();
   }
 });
 
@@ -1197,17 +1210,22 @@ function showReauthToast(email) {
   const toast = document.createElement('div');
   toast.id = 'reauth-toast';
   toast.style.position = 'fixed';
-  toast.style.bottom = '20px';
+  toast.style.top = '30%';  // SafariのURLバー（下部）に隠れるのを防ぐため上部～中央寄りに変更
   toast.style.left = '50%';
   toast.style.transform = 'translateX(-50%)';
-  toast.style.background = 'rgba(0, 0, 0, 0.85)';
+  toast.style.background = 'rgba(0, 0, 0, 0.9)';
   toast.style.color = '#fff';
-  toast.style.padding = '12px 20px';
-  toast.style.borderRadius = '8px';
+  toast.style.padding = '20px 24px';
+  toast.style.borderRadius = '12px';
+  toast.style.boxShadow = '0 10px 25px rgba(0,0,0,0.5)';
   toast.style.zIndex = '9999';
   toast.style.display = 'flex';
+  toast.style.flexDirection = 'column';
   toast.style.alignItems = 'center';
   toast.style.gap = '15px';
+  toast.style.width = '85%';
+  toast.style.maxWidth = '350px';
+  toast.style.textAlign = 'center';
   toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
   toast.style.fontSize = '14px';
 
