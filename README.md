@@ -1,8 +1,8 @@
-# VRLLM — VRoid AI アシスタント
+# AiLiveTalk — 3Dアバター AIアシスタント
 
-**https://thousandsofties.github.io/VRLLM/**
+**https://thousandsofties.github.io/AI-LiveTalk/**
 
-VRM キャラクターと LLM を組み合わせた AI アシスタント Web アプリです。
+VRM キャラクターと LLM を組み合わせた 3D AI アシスタント Web アプリです。
 ブラウザだけで動作し、スマートフォンからも利用できます。
 
 ## 機能
