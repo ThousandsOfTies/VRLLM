@@ -4,50 +4,6 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
 
-// 感情ごとのアイドルモーションへの加算オフセット
-const EMOTION_POSE_OFFSETS = {
-  happy: {
-    chest:         { x:  0.12 },
-    upperChest:    { x:  0.08 },
-    head:          { x: -0.12 },
-    leftShoulder:  { z:  0.15 },
-    rightShoulder: { z: -0.15 },
-  },
-  sad: {
-    chest:         { x: -0.12 },
-    upperChest:    { x: -0.08 },
-    head:          { x:  0.18 },
-    leftShoulder:  { z: -0.15 },
-    rightShoulder: { z:  0.15 },
-    leftUpperArm:  { z: -0.15 },
-    rightUpperArm: { z:  0.15 },
-  },
-  angry: {
-    chest:         { x:  0.15 },
-    upperChest:    { x:  0.10 },
-    head:          { x:  0.10 },
-    leftShoulder:  { z:  0.12 },
-    rightShoulder: { z: -0.12 },
-    leftUpperArm:  { z:  0.12 },
-    rightUpperArm: { z: -0.12 },
-  },
-  surprised: {
-    chest:         { x: -0.08 },
-    upperChest:    { x: -0.06 },
-    head:          { x: -0.18 },
-    leftShoulder:  { z:  0.28 },
-    rightShoulder: { z: -0.28 },
-  },
-  relaxed: {
-    spine:         { z:  0.05 },
-    chest:         { x: -0.06 },
-    upperChest:    { x: -0.04 },
-    head:          { x: -0.06, y:  0.12 },
-    leftShoulder:  { z: -0.12 },
-    rightShoulder: { z:  0.08 },
-  },
-};
-
 export class VRMViewer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -80,14 +36,6 @@ export class VRMViewer {
 
     // 話し中フラグ
     this._isTalking = false;
-
-    // 感情ポーズ（プロシージャル）
-    this._emotionPose          = null;
-    this._emotionBlend         = 0.0;
-    this._emotionBlendTarget   = 0.0;
-    this._emotionHoldRemaining = 0.0;
-    this._emotionRestartIdle   = false;
-    this._armBaseZSaved        = null;
 
     // VRMAアニメーション
     this._mixer = null;
@@ -364,7 +312,7 @@ export class VRMViewer {
   }
 
   /**
-   * 感情名からアバターの表情とポーズを自動適用する
+   * 感情名からアバターの表情とジェスチャーを自動適用する
    * @param {'happy'|'sad'|'angry'|'surprised'|'relaxed'|'neutral'} emotion
    */
   applyEmotion(emotion) {
@@ -379,67 +327,6 @@ export class VRMViewer {
     const entry = MAP[emotion] ?? MAP['neutral'];
     this.resetExpressions();
     if (entry.expr) this.setExpression(entry.expr, entry.intensity);
-    this.setEmotionPose(emotion);
-  }
-
-  /**
-   * プロシージャルな感情ポーズを設定する（neutral/null でフェードアウト）
-   * @param {string|null} emotion
-   */
-  setEmotionPose(emotion) {
-    if (!emotion || emotion === 'neutral') {
-      this._emotionBlendTarget = 0.0;
-      return;
-    }
-    if (this._vrmaPlaying) {
-      this.stopVRMA();
-      this._emotionRestartIdle = true;
-      // VRMA停止後のアイドルモーションでT字にならないよう腕を下げたA-ポーズ相当に設定
-      this._armBaseZSaved = this._armBaseZ;
-      this._armBaseZ = 1.2;
-    }
-    this._emotionPose          = emotion;
-    this._emotionBlendTarget   = 1.0;
-    this._emotionHoldRemaining = 4.0;
-  }
-
-  _updateEmotionBlend(delta) {
-    const BLEND_IN  = 3.0;
-    const BLEND_OUT = 1.5;
-    if (this._emotionBlendTarget > 0) {
-      this._emotionHoldRemaining -= delta;
-      if (this._emotionHoldRemaining <= 0) this._emotionBlendTarget = 0.0;
-    }
-    if (this._emotionBlend < this._emotionBlendTarget) {
-      this._emotionBlend = Math.min(this._emotionBlendTarget, this._emotionBlend + BLEND_IN * delta);
-    } else if (this._emotionBlend > this._emotionBlendTarget) {
-      this._emotionBlend = Math.max(this._emotionBlendTarget, this._emotionBlend - BLEND_OUT * delta);
-      if (this._emotionBlend <= 0.001 && this._emotionRestartIdle && this._idleVrmaUrl) {
-        this._emotionBlend       = 0;
-        this._emotionRestartIdle = false;
-        if (this._armBaseZSaved !== null) {
-          this._armBaseZ     = this._armBaseZSaved;
-          this._armBaseZSaved = null;
-        }
-        this.loadVRMA(this._idleVrmaUrl, { loop: true }).catch(() => {});
-      }
-    }
-  }
-
-  _applyEmotionPoseOffset() {
-    if (!this.vrm?.humanoid || this._emotionBlend <= 0 || !this._emotionPose) return;
-    const offsets = EMOTION_POSE_OFFSETS[this._emotionPose];
-    if (!offsets) return;
-    const w = this._emotionBlend;
-    if (Math.round(w * 10) % 10 === 0) console.debug('[EmotionPose]', this._emotionPose, 'blend=', w.toFixed(2));
-    const h = this.vrm.humanoid;
-    for (const [boneName, rot] of Object.entries(offsets)) {
-      const node = h.getNormalizedBoneNode(boneName);
-      if (!node) continue;
-      if (rot.x !== undefined) node.rotation.x += rot.x * w;
-      if (rot.y !== undefined) node.rotation.y += rot.y * w;
-      if (rot.z !== undefined) node.rotation.z += rot.z * w;
-    }
   }
 
   /** 口の形（リップシンク）
@@ -523,9 +410,8 @@ export class VRMViewer {
     // --- 頭 ---
     const headNode = h.getNormalizedBoneNode('head');
     if (headNode) {
-      headNode.rotation.x = Math.sin(t * 0.18) * headXAmp;
       headNode.rotation.y = Math.sin(t * 0.25) * headYAmp;
-      headNode.rotation.z = 0; // 毎フレームリセット（感情オフセットの蓄積防止）
+      headNode.rotation.x = Math.sin(t * 0.18) * headXAmp;
     }
 
     // --- 肩 ---
@@ -550,12 +436,8 @@ export class VRMViewer {
     const elapsed = this.clock.getElapsedTime();
 
     if (this.vrm) {
-      this._updateEmotionBlend(delta);
       this._updateBlinking(delta);
-      if (!this._vrmaPlaying) {
-        this._updateIdleMotion(elapsed);
-        this._applyEmotionPoseOffset();
-      }
+      if (!this._vrmaPlaying) this._updateIdleMotion(elapsed);
       if (this._mixer) this._mixer.update(delta);
       
       // アニメーションミキサー適用後のリアルタイム姿勢補正
