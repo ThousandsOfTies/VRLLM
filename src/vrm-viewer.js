@@ -81,7 +81,6 @@ export class VRMViewer {
     this._emotionBlend         = 0.0;
     this._emotionBlendTarget   = 0.0;
     this._emotionHoldRemaining = 0.0;
-    this._emotionRestartIdle   = false;
 
     // VRMAアニメーション
     this._mixer = null;
@@ -385,10 +384,6 @@ export class VRMViewer {
       this._emotionBlendTarget = 0.0;
       return;
     }
-    if (this._vrmaPlaying) {
-      this.stopVRMA();
-      this._emotionRestartIdle = true;
-    }
     this._emotionPose          = emotion;
     this._emotionBlendTarget   = 1.0;
     this._emotionHoldRemaining = 4.0;
@@ -405,11 +400,6 @@ export class VRMViewer {
       this._emotionBlend = Math.min(this._emotionBlendTarget, this._emotionBlend + BLEND_IN * delta);
     } else if (this._emotionBlend > this._emotionBlendTarget) {
       this._emotionBlend = Math.max(this._emotionBlendTarget, this._emotionBlend - BLEND_OUT * delta);
-      if (this._emotionBlend <= 0.001 && this._emotionRestartIdle && this._idleVrmaUrl) {
-        this._emotionBlend       = 0;
-        this._emotionRestartIdle = false;
-        this.loadVRMA(this._idleVrmaUrl, { loop: true }).catch(() => {});
-      }
     }
   }
 
@@ -537,11 +527,9 @@ export class VRMViewer {
     if (this.vrm) {
       this._updateEmotionBlend(delta);
       this._updateBlinking(delta);
-      if (!this._vrmaPlaying) {
-        this._updateIdleMotion(elapsed);
-        this._applyEmotionPoseOffset();
-      }
+      if (!this._vrmaPlaying) this._updateIdleMotion(elapsed);
       if (this._mixer) this._mixer.update(delta);
+      this._applyEmotionPoseOffset();
       
       // アニメーションミキサー適用後のリアルタイム姿勢補正
       this._applyRealtimePoseCorrection();
