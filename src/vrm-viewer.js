@@ -4,42 +4,47 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
 
-// 感情ごとのアイドルモーションへの加算オフセット（モデスト）
+// 感情ごとのアイドルモーションへの加算オフセット
 const EMOTION_POSE_OFFSETS = {
   happy: {
-    chest:         { x:  0.04 },
-    head:          { x: -0.04, z:  0.02 },
-    leftShoulder:  { z:  0.04 },
-    rightShoulder: { z: -0.04 },
+    chest:         { x:  0.12 },
+    upperChest:    { x:  0.08 },
+    head:          { x: -0.12, z:  0.08 },
+    leftShoulder:  { z:  0.15 },
+    rightShoulder: { z: -0.15 },
   },
   sad: {
-    chest:         { x: -0.04 },
-    head:          { x:  0.07 },
-    leftShoulder:  { z: -0.05 },
-    rightShoulder: { z:  0.05 },
-    leftUpperArm:  { z: -0.06 },
-    rightUpperArm: { z:  0.06 },
+    chest:         { x: -0.12 },
+    upperChest:    { x: -0.08 },
+    head:          { x:  0.18 },
+    leftShoulder:  { z: -0.15 },
+    rightShoulder: { z:  0.15 },
+    leftUpperArm:  { z: -0.15 },
+    rightUpperArm: { z:  0.15 },
   },
   angry: {
-    chest:         { x:  0.06 },
-    head:          { x:  0.04 },
-    leftShoulder:  { z:  0.04 },
-    rightShoulder: { z: -0.04 },
-    leftUpperArm:  { z:  0.05 },
-    rightUpperArm: { z: -0.05 },
+    chest:         { x:  0.15 },
+    upperChest:    { x:  0.10 },
+    head:          { x:  0.10 },
+    leftShoulder:  { z:  0.12 },
+    rightShoulder: { z: -0.12 },
+    leftUpperArm:  { z:  0.12 },
+    rightUpperArm: { z: -0.12 },
   },
   surprised: {
-    chest:         { x: -0.03 },
-    head:          { x: -0.06 },
-    leftShoulder:  { z:  0.10 },
-    rightShoulder: { z: -0.10 },
+    chest:         { x: -0.08 },
+    upperChest:    { x: -0.06 },
+    head:          { x: -0.18 },
+    leftShoulder:  { z:  0.28 },
+    rightShoulder: { z: -0.28 },
   },
   relaxed: {
-    spine:         { z:  0.015 },
-    chest:         { x: -0.02 },
-    head:          { x: -0.02, y:  0.05 },
-    leftShoulder:  { z: -0.04 },
-    rightShoulder: { z:  0.03 },
+    spine:         { z:  0.05 },
+    chest:         { x: -0.06 },
+    upperChest:    { x: -0.04 },
+    head:          { x: -0.06, y:  0.12 },
+    leftShoulder:  { z: -0.12 },
+    rightShoulder: { z:  0.08 },
   },
 };
 
@@ -408,6 +413,7 @@ export class VRMViewer {
     const offsets = EMOTION_POSE_OFFSETS[this._emotionPose];
     if (!offsets) return;
     const w = this._emotionBlend;
+    if (Math.round(w * 10) % 10 === 0) console.debug('[EmotionPose]', this._emotionPose, 'blend=', w.toFixed(2));
     const h = this.vrm.humanoid;
     for (const [boneName, rot] of Object.entries(offsets)) {
       const node = h.getNormalizedBoneNode(boneName);
