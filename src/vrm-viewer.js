@@ -4,6 +4,45 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
 
+// 感情ごとのアイドルモーションへの加算オフセット（モデスト）
+const EMOTION_POSE_OFFSETS = {
+  happy: {
+    chest:         { x:  0.04 },
+    head:          { x: -0.04, z:  0.02 },
+    leftShoulder:  { z:  0.04 },
+    rightShoulder: { z: -0.04 },
+  },
+  sad: {
+    chest:         { x: -0.04 },
+    head:          { x:  0.07 },
+    leftShoulder:  { z: -0.05 },
+    rightShoulder: { z:  0.05 },
+    leftUpperArm:  { z: -0.06 },
+    rightUpperArm: { z:  0.06 },
+  },
+  angry: {
+    chest:         { x:  0.06 },
+    head:          { x:  0.04 },
+    leftShoulder:  { z:  0.04 },
+    rightShoulder: { z: -0.04 },
+    leftUpperArm:  { z:  0.05 },
+    rightUpperArm: { z: -0.05 },
+  },
+  surprised: {
+    chest:         { x: -0.03 },
+    head:          { x: -0.06 },
+    leftShoulder:  { z:  0.10 },
+    rightShoulder: { z: -0.10 },
+  },
+  relaxed: {
+    spine:         { z:  0.015 },
+    chest:         { x: -0.02 },
+    head:          { x: -0.02, y:  0.05 },
+    leftShoulder:  { z: -0.04 },
+    rightShoulder: { z:  0.03 },
+  },
+};
+
 export class VRMViewer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -36,6 +75,13 @@ export class VRMViewer {
 
     // 話し中フラグ
     this._isTalking = false;
+
+    // 感情ポーズ（プロシージャル）
+    this._emotionPose          = null;
+    this._emotionBlend         = 0.0;
+    this._emotionBlendTarget   = 0.0;
+    this._emotionHoldRemaining = 0.0;
+    this._emotionRestartIdle   = false;
 
     // VRMAアニメーション
     this._mixer = null;
@@ -312,7 +358,7 @@ export class VRMViewer {
   }
 
   /**
-   * 感情名からアバターの表情とジェスチャーを自動適用する
+   * 感情名からアバターの表情とポーズを自動適用する
    * @param {'happy'|'sad'|'angry'|'surprised'|'relaxed'|'neutral'} emotion
    */
   applyEmotion(emotion) {
@@ -327,6 +373,59 @@ export class VRMViewer {
     const entry = MAP[emotion] ?? MAP['neutral'];
     this.resetExpressions();
     if (entry.expr) this.setExpression(entry.expr, entry.intensity);
+    this.setEmotionPose(emotion);
+  }
+
+  /**
+   * プロシージャルな感情ポーズを設定する（neutral/null でフェードアウト）
+   * @param {string|null} emotion
+   */
+  setEmotionPose(emotion) {
+    if (!emotion || emotion === 'neutral') {
+      this._emotionBlendTarget = 0.0;
+      return;
+    }
+    if (this._vrmaPlaying) {
+      this.stopVRMA();
+      this._emotionRestartIdle = true;
+    }
+    this._emotionPose          = emotion;
+    this._emotionBlendTarget   = 1.0;
+    this._emotionHoldRemaining = 4.0;
+  }
+
+  _updateEmotionBlend(delta) {
+    const BLEND_IN  = 3.0;
+    const BLEND_OUT = 1.5;
+    if (this._emotionBlendTarget > 0) {
+      this._emotionHoldRemaining -= delta;
+      if (this._emotionHoldRemaining <= 0) this._emotionBlendTarget = 0.0;
+    }
+    if (this._emotionBlend < this._emotionBlendTarget) {
+      this._emotionBlend = Math.min(this._emotionBlendTarget, this._emotionBlend + BLEND_IN * delta);
+    } else if (this._emotionBlend > this._emotionBlendTarget) {
+      this._emotionBlend = Math.max(this._emotionBlendTarget, this._emotionBlend - BLEND_OUT * delta);
+      if (this._emotionBlend <= 0.001 && this._emotionRestartIdle && this._idleVrmaUrl) {
+        this._emotionBlend       = 0;
+        this._emotionRestartIdle = false;
+        this.loadVRMA(this._idleVrmaUrl, { loop: true }).catch(() => {});
+      }
+    }
+  }
+
+  _applyEmotionPoseOffset() {
+    if (!this.vrm?.humanoid || this._emotionBlend <= 0 || !this._emotionPose) return;
+    const offsets = EMOTION_POSE_OFFSETS[this._emotionPose];
+    if (!offsets) return;
+    const w = this._emotionBlend;
+    const h = this.vrm.humanoid;
+    for (const [boneName, rot] of Object.entries(offsets)) {
+      const node = h.getNormalizedBoneNode(boneName);
+      if (!node) continue;
+      if (rot.x !== undefined) node.rotation.x += rot.x * w;
+      if (rot.y !== undefined) node.rotation.y += rot.y * w;
+      if (rot.z !== undefined) node.rotation.z += rot.z * w;
+    }
   }
 
   /** 口の形（リップシンク）
@@ -436,8 +535,12 @@ export class VRMViewer {
     const elapsed = this.clock.getElapsedTime();
 
     if (this.vrm) {
+      this._updateEmotionBlend(delta);
       this._updateBlinking(delta);
-      if (!this._vrmaPlaying) this._updateIdleMotion(elapsed);
+      if (!this._vrmaPlaying) {
+        this._updateIdleMotion(elapsed);
+        this._applyEmotionPoseOffset();
+      }
       if (this._mixer) this._mixer.update(delta);
       
       // アニメーションミキサー適用後のリアルタイム姿勢補正
