@@ -9,7 +9,7 @@ const EMOTION_POSE_OFFSETS = {
   happy: {
     chest:         { x:  0.12 },
     upperChest:    { x:  0.08 },
-    head:          { x: -0.12, z:  0.08 },
+    head:          { x: -0.12 },
     leftShoulder:  { z:  0.15 },
     rightShoulder: { z: -0.15 },
   },
@@ -394,9 +394,9 @@ export class VRMViewer {
     if (this._vrmaPlaying) {
       this.stopVRMA();
       this._emotionRestartIdle = true;
-      // VRMA停止後のアイドルモーションでT字にならないようarmBaseZを0に強制
+      // VRMA停止後のアイドルモーションでT字にならないよう腕を下げたA-ポーズ相当に設定
       this._armBaseZSaved = this._armBaseZ;
-      this._armBaseZ = 0.0;
+      this._armBaseZ = 1.2;
     }
     this._emotionPose          = emotion;
     this._emotionBlendTarget   = 1.0;
@@ -523,8 +523,9 @@ export class VRMViewer {
     // --- 頭 ---
     const headNode = h.getNormalizedBoneNode('head');
     if (headNode) {
-      headNode.rotation.y = Math.sin(t * 0.25) * headYAmp;
       headNode.rotation.x = Math.sin(t * 0.18) * headXAmp;
+      headNode.rotation.y = Math.sin(t * 0.25) * headYAmp;
+      headNode.rotation.z = 0; // 毎フレームリセット（感情オフセットの蓄積防止）
     }
 
     // --- 肩 ---
