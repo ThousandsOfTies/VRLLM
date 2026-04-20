@@ -5,7 +5,7 @@ import {
 } from './uiUtils.js';
 
 let _viewer, _llm, _speech, _lipSync, _driveSync;
-let _scheduleHistorySave;
+let _scheduleHistorySave, _getVrmaEmotionMap, _resolveVrmaUrl;
 let _chatInput;
 let _activePipeline      = null;
 let _autoSaveProfileTimer = null;
@@ -15,18 +15,23 @@ export function initChatManager({
   viewer, llm, speech, lipSync, driveSync,
   scheduleHistorySave, getVrmaEmotionMap, resolveVrmaUrl,
 }) {
-  _viewer              = viewer;
-  _llm                 = llm;
-  _speech              = speech;
-  _lipSync             = lipSync;
-  _driveSync           = driveSync;
+  _viewer             = viewer;
+  _llm                = llm;
+  _speech             = speech;
+  _lipSync            = lipSync;
+  _driveSync          = driveSync;
   _scheduleHistorySave = scheduleHistorySave;
+  _getVrmaEmotionMap  = getVrmaEmotionMap;
+  _resolveVrmaUrl     = resolveVrmaUrl;
 
   _chatInput = document.getElementById('chat-input');
 
   _llm.onEmotionDetected = (emotion) => {
     _viewer.applyEmotion(emotion);
     setStatus(`感情: ${emotion}`);
+    const vrmaMap = _getVrmaEmotionMap();
+    const url = _resolveVrmaUrl(vrmaMap[emotion] || vrmaMap.neutral);
+    _viewer.loadVRMA(url, { loop: false, isIdle: false }).catch(e => console.warn('感情VRMA再生失敗:', e));
   };
 
   _llm.onMemoDetected = (memo) => {
