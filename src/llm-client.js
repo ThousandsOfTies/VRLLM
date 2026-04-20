@@ -17,7 +17,7 @@ const EMOTION_INSTRUCTION = `
 const DEFAULTS = {
   endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai/',
   apiKey: '',
-  model: 'gemini-2.5-flash',
+  model: 'gemini-3.1-flash-lite-preview',
   systemPrompt: `あなたの名前はリリムです。あなたは私の親しい友達です。タメ口で、フレンドリーにおしゃべりしてください。
 AIアシスタントのような「何かお手伝いしましょうか？」といった堅苦しい発言やサポート役としての態度は禁止です。
 基本的には長文になりすぎないよう、簡潔な日本語で会話を弾ませてください。`,

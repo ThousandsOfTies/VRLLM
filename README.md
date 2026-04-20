@@ -1,8 +1,16 @@
+<<<<<<< HEAD
 # AiLiveTalk — 3Dアバター AIアシスタント
+=======
+# AI-LiveTalk
+>>>>>>> af0229e062e53a9b0dfbc715e3cf5c154e4866c8
 
 **https://thousandsofties.github.io/AI-LiveTalk/**
 
+<<<<<<< HEAD
 VRM キャラクターと LLM を組み合わせた 3D AI アシスタント Web アプリです。
+=======
+VRM キャラクターと LLM を組み合わせたリアルタイム AI コンパニオン Web アプリです。
+>>>>>>> af0229e062e53a9b0dfbc715e3cf5c154e4866c8
 ブラウザだけで動作し、スマートフォンからも利用できます。
 
 ## 機能
