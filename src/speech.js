@@ -19,6 +19,8 @@ export class SpeechManager {
 
     /** @type {function(string):void} */
     this.onTranscript = null;
+    /** @type {function(string):void} */
+    this.onInterimTranscript = null;
     /** @type {function():void} */
     this.onListeningEnd = null;
     /** @type {function():void} */
@@ -130,13 +132,18 @@ export class SpeechManager {
     this._recognition = new SR();
     this._recognition.lang = 'ja-JP';
     this._recognition.continuous = false;
-    this._recognition.interimResults = false;
+    this._recognition.interimResults = true;
 
     this._recognition.onresult = (e) => {
-      clearTimeout(this._recognitionTimer);
-      const text = e.results[0][0].transcript;
-      this.isListening = false;
-      this.onTranscript?.(text);
+      const result = e.results[e.results.length - 1];
+      const text = result[0].transcript;
+      if (result.isFinal) {
+        clearTimeout(this._recognitionTimer);
+        this.isListening = false;
+        this.onTranscript?.(text);
+      } else {
+        this.onInterimTranscript?.(text);
+      }
     };
 
     this._recognition.onend = () => {

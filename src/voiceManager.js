@@ -50,16 +50,26 @@ export async function startListeningOnce() {
   _stopBtn.classList.remove('hidden');
   setStatus(_speech.isNoisy ? '✦ 高精度認識中...' : '🎤 聞いています...');
 
+  const chatInput = document.getElementById('chat-input');
+
+  _speech.onInterimTranscript = (text) => {
+    chatInput.value = text;
+    chatInput.dispatchEvent(new Event('input'));
+  };
+
   _speech.onTranscript = (text) => {
     _micBtn.classList.remove('active');
     _stopBtn.classList.add('hidden');
+    chatInput.value = '';
+    chatInput.dispatchEvent(new Event('input'));
     _sendMessage(text);
   };
 
   _speech.onListeningEnd = () => {
     _micBtn.classList.remove('active');
     _stopBtn.classList.add('hidden');
-    const chatInput = document.getElementById('chat-input');
+    chatInput.value = '';
+    chatInput.dispatchEvent(new Event('input'));
     if (autoListenMode && !chatInput.disabled) {
       startListeningOnce();
     } else if (!autoListenMode) {
