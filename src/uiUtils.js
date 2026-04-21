@@ -84,5 +84,6 @@ export function setInputEnabled(enabled) {
 
 export function autoResizeTextarea() {
   _chatInput.style.height = 'auto';
-  _chatInput.style.height = Math.min(_chatInput.scrollHeight, 120) + 'px';
+  const maxH = parseInt(getComputedStyle(_chatInput).maxHeight, 10) || 120;
+  _chatInput.style.height = Math.min(_chatInput.scrollHeight, maxH) + 'px';
 }

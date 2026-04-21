@@ -193,6 +193,10 @@ body {
 }
 #chat-input:focus { outline: none; border-color: #6c63ff; }
 #chat-input:disabled { opacity: 0.5; }
+#chat-input.recording {
+  max-height: 240px;
+  transition: border-color 0.2s, max-height 0.25s ease;
+}
 
 #send-btn {
   background: #6c63ff;
@@ -268,24 +272,6 @@ body {
   50%       { box-shadow: 0 0 0 8px rgba(231, 76, 60, 0); }
 }
 
-#stop-btn {
-  background: #c0392b;
-  border: 1px solid #e74c3c;
-  color: #fff;
-  padding: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s;
-  flex-shrink: 0;
-  touch-action: manipulation;
-}
-#stop-btn:hover { background: #a93226; }
 
 /* ---- 設定パネル (オーバーレイ) ---- */
 #settings-panel {

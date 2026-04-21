@@ -75,6 +75,7 @@ export async function sendMessage(text) {
   // iOS Safari の自動再生ブロック回避のため、ユーザージェスチャー直後に AudioContext を解禁
   await _speech.unlockAudio();
 
+  _chatInput.classList.remove('recording');
   _chatInput.value = '';
   autoResizeTextarea();
 

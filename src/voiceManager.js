@@ -1,24 +1,16 @@
 import { setStatus } from './uiUtils.js';
 import { setOnPipelineEnd } from './chatManager.js';
 
-let _speech, _llm, _micBtn, _stopBtn, _sendMessage;
+let _speech, _llm, _micBtn, _sendMessage;
 let autoListenMode    = false;
 let _longPressTimer   = null;
 let _longPressTriggered = false;
 
-export function initVoiceManager({ speech, llm, micBtn, stopBtn, sendMessage }) {
+export function initVoiceManager({ speech, llm, micBtn, sendMessage }) {
   _speech      = speech;
   _llm         = llm;
   _micBtn      = micBtn;
-  _stopBtn     = stopBtn;
   _sendMessage = sendMessage;
-
-  stopBtn.addEventListener('click', () => {
-    if (!_speech.isListening) return;
-    _speech.stopListening();
-    _stopBtn.classList.add('hidden');
-    if (_speech.isNoisy) setStatus('処理中...');
-  });
 
   if (!speech.sttSupported) {
     micBtn.disabled = true;
@@ -47,10 +39,10 @@ export async function startListeningOnce() {
   _speech.setLang(_llm.ttsLang);
   await _speech.startListening();
   _micBtn.classList.add('active');
-  _stopBtn.classList.remove('hidden');
   setStatus(_speech.isNoisy ? '✦ 高精度認識中...' : '🎤 聞いています...');
 
   const chatInput = document.getElementById('chat-input');
+  chatInput.classList.add('recording');
 
   _speech.onInterimTranscript = (text) => {
     chatInput.value = text;
@@ -59,20 +51,21 @@ export async function startListeningOnce() {
 
   _speech.onTranscript = (text) => {
     _micBtn.classList.remove('active');
-    _stopBtn.classList.add('hidden');
     if (autoListenMode) {
+      chatInput.classList.remove('recording');
       _sendMessage(text);
     } else {
       chatInput.value = text;
       chatInput.dispatchEvent(new Event('input'));
       chatInput.focus();
       setStatus('');
+      // .recording を維持してユーザーが全文を確認できる状態に
     }
   };
 
   _speech.onListeningEnd = () => {
     _micBtn.classList.remove('active');
-    _stopBtn.classList.add('hidden');
+    chatInput.classList.remove('recording');
     if (autoListenMode && !chatInput.disabled) {
       startListeningOnce();
     } else if (!autoListenMode) {
@@ -101,7 +94,6 @@ function _exitAutoListen() {
   if (_speech.isListening) {
     _speech.stopListening();
     _micBtn.classList.remove('active');
-    _stopBtn.classList.add('hidden');
   }
   setStatus('');
 }
@@ -131,7 +123,6 @@ function _registerListeners() {
     if (_speech.isListening) {
       _speech.stopListening();
       _micBtn.classList.remove('active');
-      _stopBtn.classList.add('hidden');
       setStatus('');
       return;
     }
