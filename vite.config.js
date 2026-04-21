@@ -81,7 +81,9 @@ function aivisAutoStart() {
 
 export default defineConfig({
   plugins: [aivisAutoStart()],
-  base: process.env.GITHUB_PAGES ? '/VRLLM/' : '/',
+  base: process.env.GITHUB_PAGES
+    ? `/${process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'AI-LiveTalk'}/`
+    : '/',
   server: {
     port: 5173,
   },
