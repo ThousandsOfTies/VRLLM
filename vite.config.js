@@ -56,7 +56,7 @@ function aivisAutoStart() {
       }
 
       console.log('\x1b[36m⏳ AivisSpeech Engine を起動中...\x1b[0m');
-      aivisProcess = spawn(exePath, [], {
+      aivisProcess = spawn(exePath, ['--cors_policy_mode', 'all'], {
         detached: false,
         stdio: 'ignore',
         windowsHide: true,
