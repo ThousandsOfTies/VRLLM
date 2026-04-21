@@ -126,8 +126,8 @@ export async function loadBuiltinVRM() {
   try {
     await _viewer.loadVRM(import.meta.env.BASE_URL + 'vrm/Lilym.vrm', (pct) => setStatus(`読み込み中... ${pct}%`));
     setStatus('デフォルトモーション適用中...');
-    await _viewer.loadVRMA(import.meta.env.BASE_URL + 'vrma/VRMA_03.vrma', { loop: true, isIdle: true });
-    _vrmaPresetSelect.value = 'vrma/VRMA_03.vrma';
+    await loadDefaultVRMA(true);
+    _vrmaPresetSelect.value = 'neutral';
     setStatus('');
     captureAiAvatar();
   } catch (err) {
