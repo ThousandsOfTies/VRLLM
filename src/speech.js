@@ -34,8 +34,8 @@ export class SpeechManager {
     this._useCloud = this._cloud.isAvailable();
     if (this._useCloud) console.log('[TTS] Aivis Cloud API を使用します');
 
-    // ローカル AivisSpeech クライアント
-    this._aivis = new AivisSpeechClient('http://localhost:10101', 888753760);
+    // ローカル AivisSpeech クライアント (Vite Proxy: /aivis -> http://localhost:10101)
+    this._aivis = new AivisSpeechClient('/aivis', 888753760);
     this._useAivis = false; // isAvailable() で確認後に true になる
     if (!this._useCloud) this._checkAivis();
 

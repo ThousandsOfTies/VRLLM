@@ -86,5 +86,12 @@ export default defineConfig({
     : '/',
   server: {
     port: 5173,
+    proxy: {
+      '/aivis': {
+        target: 'http://localhost:10101',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/aivis/, ''),
+      },
+    },
   },
 });
