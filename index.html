@@ -168,15 +168,15 @@
             <span class="hint">起動中なら自動検出されます (デフォルト: http://localhost:10101)</span>
             <input type="text" id="setting-aivis-url" placeholder="http://localhost:10101" autocomplete="off" spellcheck="false">
           </label>
-          <label>
-            AivisSpeech 話者ID
-            <span class="hint">話者IDは AivisSpeech の画面で確認できます</span>
-            <div style="display:flex;gap:8px;align-items:center">
-              <input type="number" id="setting-aivis-speaker" placeholder="888753760" style="flex:1" autocomplete="off">
-              <button type="button" id="aivis-check-btn">疎通確認</button>
+          <div class="setting-item">
+            <label>AivisSpeech 話者ID</label>
+            <span class="hint">接続中ならリストから選べます</span>
+            <div class="row-flex">
+              <select id="setting-aivis-speaker" style="flex:1"></select>
+              <button type="button" id="aivis-check-btn" class="small-btn">疎通確認・リスト更新</button>
             </div>
-            <span id="aivis-status" class="hint"></span>
-          </label>
+            <div id="aivis-status" class="status-msg hint"></div>
+          </div>
           <label>
             Aivis Cloud API キー
             <span class="hint">Cloud API を使うと PC なしでスマホからも高品質 TTS が使えます (<a href="https://hub.aivis-project.com/cloud-api/dashboard" target="_blank">取得</a>)</span>

@@ -147,8 +147,12 @@ function _openSettings() {
   document.getElementById('setting-tts-lang').value      = _llm.ttsLang;
 
   const ss = _speech.getSettings();
-  document.getElementById('setting-aivis-url').value         = ss.aivis_url              || 'http://localhost:10101';
-  document.getElementById('setting-aivis-speaker').value     = ss.aivis_speaker_id        || '888753760';
+  document.getElementById('setting-aivis-url').value     = ss.aivis_url              || 'http://127.0.0.1:10101';
+  
+  // スピーカーリストの初期化（現在のIDだけ先に入れておく）
+  const speakerSelect = document.getElementById('setting-aivis-speaker');
+  speakerSelect.innerHTML = `<option value="${ss.aivis_speaker_id}">${ss.aivis_speaker_id}</option>`;
+  speakerSelect.value = ss.aivis_speaker_id || '';
   document.getElementById('setting-cloud-api-key').value     = ss.aivis_cloud_api_key    || '';
   document.getElementById('setting-cloud-model-uuid').value  = ss.aivis_cloud_model_uuid || '';
 
@@ -236,14 +240,38 @@ function _saveSettingsHandler() {
 
 async function _checkAivis() {
   const statusEl2 = document.getElementById('aivis-status');
-  const url     = document.getElementById('setting-aivis-url').value.trim();
-  const speaker = document.getElementById('setting-aivis-speaker').value.trim();
+  const url       = document.getElementById('setting-aivis-url').value.trim();
+  const select    = document.getElementById('setting-aivis-speaker');
+  const currentId = select.value;
+
   statusEl2.textContent = '確認中...';
-  _speech.updateAivisSettings(url, speaker);
-  await new Promise(r => setTimeout(r, 800));
-  statusEl2.textContent = _speech._useAivis
-    ? '✅ AivisSpeech に接続できました'
-    : '❌ 接続できません。AivisSpeech が起動しているか確認してください';
+  
+  try {
+    const res = await fetch(`${url.replace(/\/$/, '')}/speakers`);
+    if (!res.ok) throw new Error();
+    const speakers = await res.json();
+
+    // リストを更新
+    select.innerHTML = '';
+    speakers.forEach(sp => {
+      sp.styles.forEach(st => {
+        const opt = document.createElement('option');
+        opt.value = st.id;
+        opt.textContent = `${sp.name} (${st.name}) : ${st.id}`;
+        select.appendChild(opt);
+      });
+    });
+    
+    // 前の選択があれば復元、なければ先頭
+    if ([...select.options].some(o => o.value === currentId)) {
+      select.value = currentId;
+    }
+
+    _speech.updateAivisSettings(url, select.value);
+    statusEl2.textContent = '✅ AivisSpeech に接続し、リストを更新しました';
+  } catch (e) {
+    statusEl2.textContent = '❌ 接続失敗。URL または --cors_policy_mode all を確認してください';
+  }
 }
 
 function _cancelSettings() {
