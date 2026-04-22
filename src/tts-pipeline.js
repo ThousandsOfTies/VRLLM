@@ -40,6 +40,7 @@ export class TTSPipeline {
     // 外部コールバック
     this.onSpeechStart = null;
     this.onSpeechEnd   = null;
+    this.onSpeechError = null;
 
     // done() が await できるよう Promise を作成
     let resolve;
@@ -164,6 +165,7 @@ export class TTSPipeline {
         await this._playBuffer(audioBuffer);
       } catch (err) {
         console.warn('[TTSPipeline] 合成/再生エラー:', err.message);
+        this.onSpeechError?.(err);
       }
     }
     this._loopRunning = false;

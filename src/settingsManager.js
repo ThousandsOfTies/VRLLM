@@ -156,7 +156,8 @@ function _openSettings() {
   document.getElementById('setting-cloud-api-key').value     = ss.aivis_cloud_api_key    || '';
   document.getElementById('setting-cloud-model-uuid').value  = ss.aivis_cloud_model_uuid || '';
 
-  const ttsMode = _speech._useCloud ? '✅ Cloud API 使用中'
+  const ttsMode = _speech._useCloud
+    ? (_speech._cloud.modelUuid ? '✅ Cloud API 使用中' : '⚠️ Cloud API: モデルUUIDが未設定')
     : _speech._useAivis ? '✅ ローカル AivisSpeech 使用中' : '❌ ブラウザTTS使用中';
   document.getElementById('aivis-status').textContent = ttsMode;
 
