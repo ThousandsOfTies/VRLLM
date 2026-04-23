@@ -1,7 +1,7 @@
 /**
  * Web Speech API ラッパー
  * - STT (音声認識): 環境音レベルに応じて Web Speech API / Gemini Audio を自動切替
- * - TTS: Aivis Cloud API (最優先) / ローカル AivisSpeech / ブラウザ SpeechSynthesis (フォールバック)
+ * - TTS: ローカル AivisSpeech (最優先) / Aivis Cloud API / ブラウザ SpeechSynthesis (フォールバック)
  */
 import { AivisSpeechClient, AivisCloudClient } from './aivis-speech.js';
 
@@ -75,6 +75,7 @@ export class SpeechManager {
   async _checkAivis() {
     this._useAivis = await this._aivis.isAvailable();
     if (this._useAivis) console.log('[TTS] ローカル AivisSpeech を使用します');
+    else if (this._useCloud) console.log('[TTS] Aivis Cloud API を使用します');
     else console.log('[TTS] ブラウザ SpeechSynthesis を使用します');
   }
 
@@ -335,7 +336,7 @@ export class SpeechManager {
   }
 
   /**
-   * テキストを読み上げる（Cloud API > AivisSpeech > ブラウザTTS の優先順位）
+   * テキストを読み上げる（ローカル AivisSpeech > Cloud API > ブラウザTTS の優先順位）
    * @param {string} text
    * @param {{ lang?: string, rate?: number, pitch?: number }} options
    * @returns {Promise<void>}
@@ -448,8 +449,8 @@ export class SpeechManager {
    * iOS Safari 等での再生ブロック（無音状態のまま onended が来ないバグ）を回避する
    */
   async unlockAudio() {
-    if (this._useCloud) await this._cloud._getAudioCtx();
-    else if (this._useAivis) await this._aivis._getAudioCtx();
+    if (this._useAivis) await this._aivis._getAudioCtx();
+    else if (this._useCloud) await this._cloud._getAudioCtx();
   }
 
   stopSpeaking() {

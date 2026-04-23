@@ -117,6 +117,9 @@ export async function sendMessage(text) {
     _viewer.resetExpressions();
     setStatus('');
   };
+  pipeline.onSpeechError = (err) => {
+    setStatus(`⚠️ TTS エラー: ${err.message}`);
+  };
 
   let fullResponse = '';
 

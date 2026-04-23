@@ -179,9 +179,9 @@ export class AivisCloudClient {
     return this._audioCtx;
   }
 
-  /** APIキーとモデルUUIDが設定されているか */
+  /** APIキーが設定されているか */
   isAvailable() {
-    return !!(this.apiKey && this.modelUuid);
+    return !!this.apiKey;
   }
 
   /**
@@ -190,6 +190,7 @@ export class AivisCloudClient {
    * @returns {Promise<AudioBuffer>}
    */
   async synthesize(text) {
+    if (!this.modelUuid) throw new Error('Aivis Cloud: モデルUUIDが未設定です。設定からモデルUUIDを入力してください');
     const res = await fetch('https://api.aivis-project.com/v1/tts/synthesize', {
       method: 'POST',
       headers: {
