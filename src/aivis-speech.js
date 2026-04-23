@@ -201,15 +201,13 @@ export class AivisCloudClient {
         model_uuid: this.modelUuid,
         text,
         use_ssml: false,
-        use_volume_normalizer: true,
         output_format: 'mp3',
-        leading_silence_seconds: 0.0,
-        trailing_silence_seconds: 0.1,
       }),
     });
 
     if (res.status === 401) throw new Error('Aivis Cloud API: APIキーが無効です');
     if (res.status === 402) throw new Error('Aivis Cloud API: クレジット残高不足');
+    if (res.status === 404) throw new Error('Aivis Cloud API: モデルが見つかりません。設定のモデルUUIDを確認してください');
     if (!res.ok) throw new Error(`Aivis Cloud API エラー: ${res.status}`);
 
     const arrayBuffer = await res.arrayBuffer();
