@@ -46,6 +46,7 @@ export function initSettingsManager({ viewer, llm, speech, driveSync, storage })
   });
 
   _registerSliderListeners();
+  _registerCloudStatusListeners();
 }
 
 // ---- Public API ----
@@ -156,10 +157,7 @@ function _openSettings() {
   document.getElementById('setting-cloud-api-key').value     = ss.aivis_cloud_api_key    || '';
   document.getElementById('setting-cloud-model-uuid').value  = ss.aivis_cloud_model_uuid || '';
 
-  const ttsMode = _speech._useCloud
-    ? (_speech._cloud.modelUuid ? '✅ Cloud API 使用中' : '⚠️ Cloud API: モデルUUIDが未設定')
-    : _speech._useAivis ? '✅ ローカル AivisSpeech 使用中' : '❌ ブラウザTTS使用中';
-  document.getElementById('aivis-status').textContent = ttsMode;
+  _updateCloudStatus();
 
   document.getElementById('setting-arm-correction').value      = _savedArmCorr;
   document.getElementById('setting-arm-correction-num').value  = _savedArmCorr;
@@ -329,4 +327,23 @@ function _registerSliderListeners() {
     document.getElementById('setting-chest-correction').value = v;
     _viewer.setVRMAChestCorrection(v);
   });
+}
+
+function _updateCloudStatus() {
+  const apiKey   = document.getElementById('setting-cloud-api-key').value.trim();
+  const modelUuid = document.getElementById('setting-cloud-model-uuid').value.trim();
+  let msg;
+  if (!apiKey) {
+    msg = _speech._useAivis ? '✅ ローカル AivisSpeech 使用中' : '❌ ブラウザTTS使用中';
+  } else if (!modelUuid) {
+    msg = '⚠️ Cloud API: モデルUUIDが未設定';
+  } else {
+    msg = '✅ Cloud API 使用中';
+  }
+  document.getElementById('aivis-status').textContent = msg;
+}
+
+function _registerCloudStatusListeners() {
+  document.getElementById('setting-cloud-api-key').addEventListener('input', _updateCloudStatus);
+  document.getElementById('setting-cloud-model-uuid').addEventListener('input', _updateCloudStatus);
 }
