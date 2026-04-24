@@ -9,12 +9,12 @@ let _vrmFileNames     = {};
 let _vrmSystemPrompts = {};
 let _aiAvatarUrl      = null;
 let _vrmaEmotionMap   = {
-  neutral:   'vrma/neutral.vrma',
-  happy:     'vrma/happy.vrma',
-  angry:     'vrma/angry.vrma',
-  sad:       'vrma/sad.vrma',
-  surprised: 'vrma/surprised.vrma',
-  relaxed:   'vrma/relaxed.vrma',
+  neutral:   'vrma/female/neutral.vrma',
+  happy:     'vrma/female/happy.vrma',
+  angry:     'vrma/female/angry.vrma',
+  sad:       'vrma/female/sad.vrma',
+  surprised: 'vrma/female/surprised.vrma',
+  relaxed:   'vrma/female/relaxed.vrma',
 };
 
 export function initVRMManager({ viewer, storage, llm, canvas, saveSettings }) {
