@@ -1,11 +1,12 @@
 import { updateUserAvatars, appendMessage, setStatus, setStatusTemp } from './uiUtils.js';
-import { applySettings, resetToDefaults } from './settingsManager.js';
+import { applySettings, resetToDefaults, applyBackground } from './settingsManager.js';
 import { applyLocationIfEnabled, getLocationEnabled } from './locationManager.js';
 import { getAutoSaveEnabled } from './historySync.js';
 import {
   getCurrentVrmId, getVrmSystemPrompts, getVrmFileNames,
   refreshVRMList, loadDefaultVRMA, captureAiAvatar,
 } from './vrmManager.js';
+import { getSexData } from './sexManager.js';
 
 let _driveSync, _storage, _llm, _speech, _viewer;
 
@@ -175,13 +176,16 @@ async function _onSignInChange(isSignedIn, isNewLogin = false) {
           vrmSystemPrompts[currentVrmId] ?? _llm.systemPrompt;
         document.getElementById('setting-tts-lang').value = _llm.ttsLang;
         const ss = _speech.getSettings();
+        const sexData = getSexData();
         document.getElementById('setting-aivis-url').value        = ss.aivis_url || '';
-        document.getElementById('setting-aivis-speaker').value    = ss.aivis_speaker_id || '';
+        document.getElementById('setting-aivis-speaker').value    = sexData.speakerId || '';
         document.getElementById('setting-cloud-api-key').value    = ss.aivis_cloud_api_key || '';
-        document.getElementById('setting-cloud-model-uuid').value = ss.aivis_cloud_model_uuid || '';
+        document.getElementById('setting-cloud-model-uuid').value = sexData.cloudModelUuid || '';
         locationStatus.textContent =
           getLocationEnabled() && _llm.locationContext ? `✅ ${_llm.locationContext}` : '';
       }
+
+      applyBackground(getSexData().background);
 
       // プロファイルと会話履歴の非同期ロード
       (async () => {

@@ -1,19 +1,22 @@
 import { setStatus } from './uiUtils.js';
 import {
   getVrmState, setCurrentVrmSystemPrompt, refreshVRMList, loadBuiltinVRM,
-  applySettings as vrmApplySettings,
+  applySettings as vrmApplySettings, applySexDataToVRM,
 } from './vrmManager.js';
 import {
   getAutoSaveEnabled, setAutoSaveEnabled, cancelAutoSave,
   applySettings as historyApplySettings,
 } from './historySync.js';
 import { getLocationEnabled, applySettings as locationApplySettings } from './locationManager.js';
+import {
+  getCurrentSex, setCurrentSex, getSexData, updateSexData,
+  resetToDefaults as sexResetToDefaults,
+  applySettings as sexApplySettings,
+  collectSettings as sexCollectSettings,
+} from './sexManager.js';
 
 let _viewer, _llm, _speech, _driveSync, _storage;
 let _saveSettingsTimer = null;
-let _savedArmCorr = 0;
-let _savedShCorr  = 0;
-let _savedChCorr  = 0;
 
 export function initSettingsManager({ viewer, llm, speech, driveSync, storage }) {
   _viewer    = viewer;
@@ -32,6 +35,7 @@ export function initSettingsManager({ viewer, llm, speech, driveSync, storage })
     });
   });
 
+  document.getElementById('sex-toggle-btn').addEventListener('click', switchSex);
   document.getElementById('settings-btn').addEventListener('click', _openSettings);
   document.getElementById('save-settings-btn').addEventListener('click', _saveSettingsHandler);
   document.getElementById('cancel-settings-btn').addEventListener('click', _cancelSettings);
@@ -50,23 +54,60 @@ export function initSettingsManager({ viewer, llm, speech, driveSync, storage })
 }
 
 // ---- Public API ----
-export function getArmCorr()      { return _savedArmCorr; }
-export function getShoulderCorr() { return _savedShCorr; }
-export function getChestCorr()    { return _savedChCorr; }
+export function getArmCorr()      { return getSexData().armCorrection; }
+export function getShoulderCorr() { return getSexData().shoulderCorrection; }
+export function getChestCorr()    { return getSexData().chestCorrection; }
+
+export function applyBackground(path) {
+  const panel = document.getElementById('viewer-panel');
+  panel.style.background = path
+    ? `url('${import.meta.env.BASE_URL}${path}') center center / cover no-repeat, linear-gradient(160deg, #12122a 0%, #0d1526 100%)`
+    : '';
+}
+
+export async function switchSex() {
+  const next = getCurrentSex() === 'female' ? 'male' : 'female';
+  setCurrentSex(next);
+  applySexDataToVRM();
+  const d = getSexData();
+  const ss = _speech.getSettings();
+  _speech.updateAivisSettings(ss.aivis_url || _speech._aivis.baseUrl, d.speakerId);
+  _speech.updateCloudSettings(ss.aivis_cloud_api_key || _speech._cloud.apiKey, d.cloudModelUuid);
+  _viewer.setVRMArmCorrection(d.armCorrection);
+  _viewer.setVRMAShoulderCorrection(d.shoulderCorrection);
+  _viewer.setVRMAChestCorrection(d.chestCorrection);
+  applyBackground(d.background);
+  if (d.selectedVrmId === '__builtin__' || d.selectedVrmId === '__builtin_male__') {
+    await loadBuiltinVRM();
+  } else {
+    try {
+      const files = await _storage.listVRMFiles();
+      const f = files.find(f => f.id === d.selectedVrmId);
+      if (!f) throw new Error('保存されたモデルが見つかりません');
+      const buf = await _storage.downloadVRM(d.selectedVrmId);
+      const file = new File([buf], f.name, { type: 'application/octet-stream' });
+      await _viewer.loadVRM(file, (pct) => setStatus(`読み込み中... ${pct}%`));
+      setStatus('');
+    } catch (err) {
+      console.warn('VRM読み込み失敗、ビルトインに戻します:', err.message);
+      await loadBuiltinVRM();
+    }
+  }
+  const btn = document.getElementById('sex-toggle-btn');
+  if (btn) btn.textContent = getCurrentSex() === 'female' ? '♀' : '♂';
+  saveSettings();
+}
 
 export function collectSettings() {
   const vrmState = getVrmState();
   return {
     ..._llm.getSettings(),
     ..._speech.getSettings(),
-    autosave_history:        String(getAutoSaveEnabled()),
-    location_enabled:        String(getLocationEnabled()),
-    vrm_char_names:          JSON.stringify(vrmState.charNames),
-    vrm_system_prompts:      JSON.stringify(vrmState.systemPrompts),
-    selected_vrm_id:         vrmState.currentVrmId,
-    vrma_arm_correction:     String(_savedArmCorr),
-    vrma_shoulder_correction: String(_savedShCorr),
-    vrma_chest_correction:   String(_savedChCorr),
+    ...sexCollectSettings(),
+    autosave_history:   String(getAutoSaveEnabled()),
+    location_enabled:   String(getLocationEnabled()),
+    vrm_char_names:     JSON.stringify(vrmState.charNames),
+    vrm_system_prompts: JSON.stringify(vrmState.systemPrompts),
   };
 }
 
@@ -84,34 +125,44 @@ export function applySettings(s) {
     historyApplySettings(null);
     return;
   }
+  sexApplySettings(s);
   _llm.applySettings(s);
   _speech.applySettings(s);
   historyApplySettings(s);
   locationApplySettings(s);
   vrmApplySettings(s);
-  if (s.vrma_arm_correction !== undefined) {
-    _savedArmCorr = parseFloat(s.vrma_arm_correction) || 0;
-    _viewer.setVRMArmCorrection(_savedArmCorr);
-  }
-  if (s.vrma_shoulder_correction !== undefined) {
-    _savedShCorr = parseFloat(s.vrma_shoulder_correction) || 0;
-    _viewer.setVRMAShoulderCorrection(_savedShCorr);
-  }
-  if (s.vrma_chest_correction !== undefined) {
-    _savedChCorr = parseFloat(s.vrma_chest_correction) || 0;
-    _viewer.setVRMAChestCorrection(_savedChCorr);
-  }
+
+  const d = getSexData();
+  _speech.updateAivisSettings(s.aivis_url || _speech._aivis.baseUrl, d.speakerId);
+  _speech.updateCloudSettings(s.aivis_cloud_api_key || _speech._cloud.apiKey, d.cloudModelUuid);
+
+  _viewer.setVRMArmCorrection(d.armCorrection);
+  _viewer.setVRMAShoulderCorrection(d.shoulderCorrection);
+  _viewer.setVRMAChestCorrection(d.chestCorrection);
+
+  applyBackground(d.background);
+  applySexDataToVRM();
 }
 
 export function resetToDefaults() {
   console.log('[Sync] 全ての状態をデフォルトにリセットします...');
+  sexResetToDefaults();
   historyApplySettings({ autosave_history: 'true' });
   locationApplySettings({ location_enabled: 'false' });
-  vrmApplySettings({ vrm_char_names: '{}', vrm_system_prompts: '{}', selected_vrm_id: '__builtin__' });
+  vrmApplySettings({ vrm_char_names: '{}', vrm_system_prompts: '{}' });
   _llm.applySettings({});
   _speech.applySettings({});
   _llm.clearHistory();
   _llm.userProfile = [];
+
+  const d = getSexData();
+  _speech.updateAivisSettings(_speech._aivis.baseUrl, d.speakerId);
+  _speech.updateCloudSettings(_speech._cloud.apiKey, d.cloudModelUuid);
+  _viewer.setVRMArmCorrection(d.armCorrection);
+  _viewer.setVRMAShoulderCorrection(d.shoulderCorrection);
+  _viewer.setVRMAChestCorrection(d.chestCorrection);
+  applyBackground(d.background);
+  applySexDataToVRM();
 
   document.getElementById('chat-messages').innerHTML = '';
   const spEl = document.getElementById('setting-system-prompt');
@@ -126,8 +177,9 @@ export function resetToDefaults() {
     document.getElementById('setting-model').value      = _llm.model;
     document.getElementById('setting-tts-lang').value   = _llm.ttsLang;
     const ss = _speech.getSettings();
-    document.getElementById('setting-aivis-url').value     = ss.aivis_url || '';
-    document.getElementById('setting-aivis-speaker').value = ss.aivis_speaker_id || '';
+    document.getElementById('setting-aivis-url').value  = ss.aivis_url || '';
+    const sexData = getSexData();
+    document.getElementById('setting-aivis-speaker').value = sexData.speakerId || '';
   }
 
   loadBuiltinVRM().catch(e => console.warn('Reset VRM failed:', e));
@@ -148,28 +200,34 @@ function _openSettings() {
   document.getElementById('setting-tts-lang').value      = _llm.ttsLang;
 
   const ss = _speech.getSettings();
-  document.getElementById('setting-aivis-url').value     = ss.aivis_url              || 'http://127.0.0.1:10101';
-  
-  // スピーカーリストの初期化（現在のIDだけ先に入れておく）
+  document.getElementById('setting-aivis-url').value = ss.aivis_url || 'http://127.0.0.1:10101';
+
+  const d = getSexData();
   const speakerSelect = document.getElementById('setting-aivis-speaker');
-  speakerSelect.innerHTML = `<option value="${ss.aivis_speaker_id}">${ss.aivis_speaker_id}</option>`;
-  speakerSelect.value = ss.aivis_speaker_id || '';
-  document.getElementById('setting-cloud-api-key').value     = ss.aivis_cloud_api_key    || '';
-  document.getElementById('setting-cloud-model-uuid').value  = ss.aivis_cloud_model_uuid || '';
+  speakerSelect.innerHTML = `<option value="${d.speakerId}">${d.speakerId}</option>`;
+  speakerSelect.value = d.speakerId || '';
+  document.getElementById('setting-cloud-api-key').value    = ss.aivis_cloud_api_key || '';
+  document.getElementById('setting-cloud-model-uuid').value = d.cloudModelUuid || '';
+
+  const indEl = document.getElementById('voice-sex-indicator');
+  if (indEl) indEl.textContent = getCurrentSex() === 'female' ? '♀ 女性キャラの音声設定' : '♂ 男性キャラの音声設定';
 
   _updateCloudStatus();
 
-  document.getElementById('setting-arm-correction').value      = _savedArmCorr;
-  document.getElementById('setting-arm-correction-num').value  = _savedArmCorr;
-  _viewer.setVRMArmCorrection(_savedArmCorr);
+  const armCorr = d.armCorrection;
+  document.getElementById('setting-arm-correction').value      = armCorr;
+  document.getElementById('setting-arm-correction-num').value  = armCorr;
+  _viewer.setVRMArmCorrection(armCorr);
 
-  document.getElementById('setting-shoulder-correction').value     = _savedShCorr;
-  document.getElementById('setting-shoulder-correction-num').value = _savedShCorr;
-  _viewer.setVRMAShoulderCorrection(_savedShCorr);
+  const shCorr = d.shoulderCorrection;
+  document.getElementById('setting-shoulder-correction').value     = shCorr;
+  document.getElementById('setting-shoulder-correction-num').value = shCorr;
+  _viewer.setVRMAShoulderCorrection(shCorr);
 
-  document.getElementById('setting-chest-correction').value     = _savedChCorr;
-  document.getElementById('setting-chest-correction-num').value = _savedChCorr;
-  _viewer.setVRMAChestCorrection(_savedChCorr);
+  const chCorr = d.chestCorrection;
+  document.getElementById('setting-chest-correction').value     = chCorr;
+  document.getElementById('setting-chest-correction-num').value = chCorr;
+  _viewer.setVRMAChestCorrection(chCorr);
 
   refreshVRMList();
 
@@ -202,21 +260,23 @@ function _saveSettingsHandler() {
   setCurrentVrmSystemPrompt(_llm.systemPrompt);
   _llm.ttsLang = document.getElementById('setting-tts-lang').value;
 
-  _savedArmCorr = parseFloat(document.getElementById('setting-arm-correction-num').value) || 0;
-  _viewer.setVRMArmCorrection(_savedArmCorr);
-  _savedShCorr = parseFloat(document.getElementById('setting-shoulder-correction-num').value) || 0;
-  _viewer.setVRMAShoulderCorrection(_savedShCorr);
-  _savedChCorr = parseFloat(document.getElementById('setting-chest-correction-num').value) || 0;
-  _viewer.setVRMAChestCorrection(_savedChCorr);
+  const armCorrection      = parseFloat(document.getElementById('setting-arm-correction-num').value) || 0;
+  const shoulderCorrection = parseFloat(document.getElementById('setting-shoulder-correction-num').value) || 0;
+  const chestCorrection    = parseFloat(document.getElementById('setting-chest-correction-num').value) || 0;
+  _viewer.setVRMArmCorrection(armCorrection);
+  _viewer.setVRMAShoulderCorrection(shoulderCorrection);
+  _viewer.setVRMAChestCorrection(chestCorrection);
+  updateSexData(getCurrentSex(), { armCorrection, shoulderCorrection, chestCorrection });
 
-  _speech.updateAivisSettings(
-    document.getElementById('setting-aivis-url').value.trim(),
-    document.getElementById('setting-aivis-speaker').value.trim()
-  );
-  _speech.updateCloudSettings(
-    document.getElementById('setting-cloud-api-key').value.trim(),
-    document.getElementById('setting-cloud-model-uuid').value.trim()
-  );
+  const url      = document.getElementById('setting-aivis-url').value.trim();
+  const speakerId = document.getElementById('setting-aivis-speaker').value.trim();
+  _speech.updateAivisSettings(url, speakerId);
+  updateSexData(getCurrentSex(), { speakerId });
+
+  const apiKey    = document.getElementById('setting-cloud-api-key').value.trim();
+  const modelUuid = document.getElementById('setting-cloud-model-uuid').value.trim();
+  _speech.updateCloudSettings(apiKey, modelUuid);
+  updateSexData(getCurrentSex(), { cloudModelUuid: modelUuid });
 
   const profileText = document.getElementById('setting-user-profile').value;
   if (profileText !== undefined) {
@@ -244,13 +304,12 @@ async function _checkAivis() {
   const currentId = select.value;
 
   statusEl2.textContent = '確認中...';
-  
+
   try {
     const res = await fetch(`${url.replace(/\/$/, '')}/speakers`);
     if (!res.ok) throw new Error();
     const speakers = await res.json();
 
-    // リストを更新
     select.innerHTML = '';
     speakers.forEach(sp => {
       sp.styles.forEach(st => {
@@ -260,8 +319,7 @@ async function _checkAivis() {
         select.appendChild(opt);
       });
     });
-    
-    // 前の選択があれば復元、なければ先頭
+
     if ([...select.options].some(o => o.value === currentId)) {
       select.value = currentId;
     }
@@ -284,9 +342,10 @@ async function _checkAivis() {
 
 function _cancelSettings() {
   document.getElementById('settings-panel').classList.add('hidden');
-  _viewer.setVRMArmCorrection(_savedArmCorr);
-  _viewer.setVRMAShoulderCorrection(_savedShCorr);
-  _viewer.setVRMAChestCorrection(_savedChCorr);
+  const d = getSexData();
+  _viewer.setVRMArmCorrection(d.armCorrection);
+  _viewer.setVRMAShoulderCorrection(d.shoulderCorrection);
+  _viewer.setVRMAChestCorrection(d.chestCorrection);
 }
 
 function _clearHistory() {
@@ -330,7 +389,7 @@ function _registerSliderListeners() {
 }
 
 function _updateCloudStatus() {
-  const apiKey   = document.getElementById('setting-cloud-api-key').value.trim();
+  const apiKey    = document.getElementById('setting-cloud-api-key').value.trim();
   const modelUuid = document.getElementById('setting-cloud-model-uuid').value.trim();
   let msg;
   if (!apiKey) {

@@ -108,27 +108,20 @@ export class SpeechManager {
 
   /** 設定を一括適用する */
   applySettings(s) {
-    if (s.aivis_url || s.aivis_speaker_id) {
-      this.updateAivisSettings(
-        s.aivis_url        || this._aivis.baseUrl,
-        s.aivis_speaker_id || this._aivis.speakerId
-      );
+    if (s.aivis_url) {
+      this._aivis.baseUrl = s.aivis_url.replace(/\/$/, '');
     }
-    if (s.aivis_cloud_api_key || s.aivis_cloud_model_uuid) {
-      this.updateCloudSettings(
-        s.aivis_cloud_api_key    || this._cloud.apiKey,
-        s.aivis_cloud_model_uuid || this._cloud.modelUuid
-      );
+    if (s.aivis_cloud_api_key) {
+      this._cloud.apiKey = s.aivis_cloud_api_key;
+      this._useCloud = this._cloud.isAvailable();
     }
   }
 
   /** 現在の設定をオブジェクトとして返す */
   getSettings() {
     return {
-      aivis_url:              this._aivis.baseUrl,
-      aivis_speaker_id:       String(this._aivis.speakerId),
-      aivis_cloud_api_key:    this._cloud.apiKey,
-      aivis_cloud_model_uuid: this._cloud.modelUuid,
+      aivis_url:           this._aivis.baseUrl,
+      aivis_cloud_api_key: this._cloud.apiKey,
     };
   }
 

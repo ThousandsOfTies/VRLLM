@@ -30,7 +30,7 @@ body {
 #viewer-panel {
   flex: 1;
   position: relative;
-  background: url('/bg.png') center center / cover no-repeat, linear-gradient(160deg, #12122a 0%, #0d1526 100%);
+  background: linear-gradient(160deg, #12122a 0%, #0d1526 100%);
   min-width: 0;
   transition: background 0.3s;
 }
@@ -93,6 +93,18 @@ body {
   color: #b8b0ff;
   letter-spacing: 0.02em;
 }
+
+#sex-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #e8e8f8;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+#sex-toggle-btn:hover { background: #1e1e36; }
 
 #settings-btn {
   background: transparent;

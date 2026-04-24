@@ -1,21 +1,15 @@
 import { setStatus } from './uiUtils.js';
+import { getCurrentSex, getSexData, updateSexData } from './sexManager.js';
 
 let _viewer, _storage, _llm, _canvas, _saveSettings;
 let _vrmModelSelect, _vrmFileInput, _vrmLoadStatus, _vrmaPresetSelect, _loadVRMABtn, _vrmaFileInput;
 
-let _currentVrmId     = '__builtin__';
+let _currentVrmId     = getSexData().selectedVrmId;
 let _vrmCharNames     = {};
 let _vrmFileNames     = {};
 let _vrmSystemPrompts = {};
 let _aiAvatarUrl      = null;
-let _vrmaEmotionMap   = {
-  neutral:   'vrma/neutral.vrma',
-  happy:     'vrma/happy.vrma',
-  angry:     'vrma/angry.vrma',
-  sad:       'vrma/sad.vrma',
-  surprised: 'vrma/surprised.vrma',
-  relaxed:   'vrma/relaxed.vrma',
-};
+let _vrmaEmotionMap   = { ...getSexData().motionMap };
 
 export function initVRMManager({ viewer, storage, llm, canvas, saveSettings }) {
   _viewer      = viewer;
@@ -63,7 +57,18 @@ export function applySettings(s) {
   if (s.vrm_system_prompts) {
     try { _vrmSystemPrompts = JSON.parse(s.vrm_system_prompts); } catch { _vrmSystemPrompts = {}; }
   }
-  if (s.selected_vrm_id) _currentVrmId = s.selected_vrm_id;
+  const currentSex = getCurrentSex();
+  const vrmId = s.sex?.[currentSex]?.selectedVrmId ?? s.selected_vrm_id;
+  if (vrmId) _currentVrmId = vrmId;
+  const motionMap = s.sex?.[currentSex]?.motionMap;
+  if (motionMap) Object.assign(_vrmaEmotionMap, motionMap);
+}
+
+export function applySexDataToVRM() {
+  const d = getSexData();
+  Object.assign(_vrmaEmotionMap, d.motionMap);
+  _currentVrmId = d.selectedVrmId;
+  refreshVRMList(d.selectedVrmId);
 }
 
 // ---- URL resolution ----
@@ -99,8 +104,14 @@ export async function refreshVRMList(selectId = undefined) {
   _vrmModelSelect.innerHTML = '';
 
   const builtinOpt = document.createElement('option');
-  builtinOpt.value = '__builtin__';
-  builtinOpt.textContent = 'リリム (デフォルト)';
+  const sex = getCurrentSex();
+  if (sex === 'male') {
+    builtinOpt.value = '__builtin_male__';
+    builtinOpt.textContent = 'ロイド (デフォルト)';
+  } else {
+    builtinOpt.value = '__builtin__';
+    builtinOpt.textContent = 'リリム (デフォルト)';
+  }
   _vrmModelSelect.appendChild(builtinOpt);
 
   for (const f of files) {
@@ -124,7 +135,16 @@ export async function loadBuiltinVRM() {
   setStatus('モデルを読み込み中...');
   _vrmModelSelect.disabled = true;
   try {
-    await _viewer.loadVRM(import.meta.env.BASE_URL + 'vrm/Lilym.vrm', (pct) => setStatus(`読み込み中... ${pct}%`));
+    const sex = getCurrentSex();
+    if (sex === 'male') {
+      try {
+        await _viewer.loadVRM(import.meta.env.BASE_URL + 'vrm/Roid.vrm', (pct) => setStatus(`読み込み中... ${pct}%`));
+      } catch {
+        await _viewer.loadVRM(import.meta.env.BASE_URL + 'vrm/Lilym.vrm', (pct) => setStatus(`読み込み中... ${pct}%`));
+      }
+    } else {
+      await _viewer.loadVRM(import.meta.env.BASE_URL + 'vrm/Lilym.vrm', (pct) => setStatus(`読み込み中... ${pct}%`));
+    }
     setStatus('デフォルトモーション適用中...');
     await loadDefaultVRMA(true);
     _vrmaPresetSelect.value = 'neutral';
@@ -139,8 +159,9 @@ export async function loadBuiltinVRM() {
 }
 
 export async function loadInitialVRM() {
-  if (_currentVrmId === '__builtin__') {
-    _llm.systemPrompt = _vrmSystemPrompts['__builtin__'] ?? _llm.systemPrompt;
+  _currentVrmId = getSexData().selectedVrmId;
+  if (_currentVrmId === '__builtin__' || _currentVrmId === '__builtin_male__') {
+    _llm.systemPrompt = _vrmSystemPrompts[_currentVrmId] ?? _vrmSystemPrompts['__builtin__'] ?? _llm.systemPrompt;
     await loadBuiltinVRM();
   } else {
     setStatus('モデルを読み込み中...');
@@ -160,8 +181,9 @@ export async function loadInitialVRM() {
       captureAiAvatar();
     } catch (err) {
       console.warn('前回のモデル読み込み失敗、ビルトインに戻します:', err.message);
-      _currentVrmId = '__builtin__';
-      _llm.systemPrompt = _vrmSystemPrompts['__builtin__'] ?? _llm.systemPrompt;
+      _currentVrmId = getCurrentSex() === 'male' ? '__builtin_male__' : '__builtin__';
+      updateSexData(getCurrentSex(), { selectedVrmId: _currentVrmId });
+      _llm.systemPrompt = _vrmSystemPrompts[_currentVrmId] ?? _vrmSystemPrompts['__builtin__'] ?? _llm.systemPrompt;
       await loadBuiltinVRM();
     } finally {
       _vrmModelSelect.disabled = false;
@@ -174,7 +196,7 @@ function _updateVrmEditRow() {
   const val = _vrmModelSelect.value;
   const editRow = document.getElementById('vrm-edit-row');
   const charNameInput = document.getElementById('vrm-char-name');
-  if (val && val !== '__add__' && val !== '__builtin__') {
+  if (val && val !== '__add__' && val !== '__builtin__' && val !== '__builtin_male__') {
     editRow.classList.remove('hidden');
     charNameInput.value = _vrmCharNames[val] || '';
     charNameInput.placeholder = _vrmFileNames[val] || '表示名を入力';
@@ -196,15 +218,17 @@ async function _handleVrmSelect(val) {
     _vrmSystemPrompts[_currentVrmId] = promptEl.value.trim();
   }
 
-  if (val === '__builtin__') {
-    _currentVrmId = '__builtin__';
+  if (val === '__builtin__' || val === '__builtin_male__') {
+    _currentVrmId = val;
+    updateSexData(getCurrentSex(), { selectedVrmId: val });
     _updateVrmEditRow();
-    _applyVrmSystemPrompt('__builtin__');
+    _applyVrmSystemPrompt(val);
     await loadBuiltinVRM();
     _saveSettings();
     return;
   }
   _currentVrmId = val;
+  updateSexData(getCurrentSex(), { selectedVrmId: val });
   _updateVrmEditRow();
   _applyVrmSystemPrompt(val);
   _vrmModelSelect.disabled = true;
@@ -245,7 +269,7 @@ function _registerListeners() {
   });
 
   document.getElementById('vrm-delete-btn').addEventListener('click', async () => {
-    if (!_currentVrmId || _currentVrmId === '__builtin__') return;
+    if (!_currentVrmId || _currentVrmId === '__builtin__' || _currentVrmId === '__builtin_male__') return;
     const dispName = _vrmCharNames[_currentVrmId] || _vrmFileNames[_currentVrmId] || _currentVrmId;
     if (!confirm(`「${dispName}」を削除しますか？`)) return;
     try {
@@ -254,8 +278,10 @@ function _registerListeners() {
       delete _vrmFileNames[_currentVrmId];
       delete _vrmSystemPrompts[_currentVrmId];
       _vrmLoadStatus.textContent = '';
-      await refreshVRMList('__builtin__');
-      _applyVrmSystemPrompt('__builtin__');
+      const fallbackId = getCurrentSex() === 'male' ? '__builtin_male__' : '__builtin__';
+      updateSexData(getCurrentSex(), { selectedVrmId: fallbackId });
+      await refreshVRMList(fallbackId);
+      _applyVrmSystemPrompt(fallbackId);
       await loadBuiltinVRM();
       _saveSettings();
     } catch (err) {
