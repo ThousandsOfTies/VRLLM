@@ -4,7 +4,7 @@ import { applyLocationIfEnabled, getLocationEnabled } from './locationManager.js
 import { getAutoSaveEnabled } from './historySync.js';
 import {
   getCurrentVrmId, getVrmSystemPrompts, getVrmFileNames,
-  refreshVRMList, loadDefaultVRMA, captureAiAvatar,
+  refreshVRMList, loadDefaultVRMA, captureAiAvatar, loadBuiltinVRM,
 } from './vrmManager.js';
 import { getSexData } from './sexManager.js';
 
@@ -230,19 +230,27 @@ async function _onSignInChange(isSignedIn, isNewLogin = false) {
 
       // Drive から設定を読んだ結果 VRM が変わっていれば読み込む
       const currentVrmId = getCurrentVrmId();
-      if (currentVrmId !== prevVrmId && currentVrmId !== '__builtin__') {
-        try {
-          await refreshVRMList(currentVrmId);
-          const vrmFileNames = getVrmFileNames();
-          const fname = vrmFileNames[currentVrmId] || currentVrmId;
-          const buf = await _storage.downloadVRM(currentVrmId);
-          const file = new File([buf], fname, { type: 'application/octet-stream' });
-          await _viewer.loadVRM(file, (pct) => setStatus(`読み込み中... ${pct}%`));
-          await loadDefaultVRMA(true);
-          setStatus('');
-          captureAiAvatar();
-        } catch (err) {
-          console.warn('Drive サインイン後の VRM 読み込み失敗:', err.message);
+      if (currentVrmId !== prevVrmId) {
+        if (currentVrmId === '__builtin__' || currentVrmId === '__builtin_male__') {
+          try {
+            await loadBuiltinVRM();
+          } catch (err) {
+            console.warn('Drive サインイン後の組み込み VRM 読み込み失敗:', err.message);
+          }
+        } else {
+          try {
+            await refreshVRMList(currentVrmId);
+            const vrmFileNames = getVrmFileNames();
+            const fname = vrmFileNames[currentVrmId] || currentVrmId;
+            const buf = await _storage.downloadVRM(currentVrmId);
+            const file = new File([buf], fname, { type: 'application/octet-stream' });
+            await _viewer.loadVRM(file, (pct) => setStatus(`読み込み中... ${pct}%`));
+            await loadDefaultVRMA(true);
+            setStatus('');
+            captureAiAvatar();
+          } catch (err) {
+            console.warn('Drive サインイン後の VRM 読み込み失敗:', err.message);
+          }
         }
       }
 
